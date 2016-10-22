@@ -22,6 +22,7 @@ clean:
 	find . -name '__pycache__' -type d -print0 | xargs -0 rmdir
 	find . -name '_trial_temp' -type d -print0 | xargs -0 rm -r
 	python setup.py clean
+	make -C examples/word-count $@
 
 clobber: clean
 	rm -fr .tox
