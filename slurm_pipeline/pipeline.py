@@ -49,6 +49,8 @@ class SlurmPipeline(object):
         self._checkSpecification(specification)
         self.specification = specification
         self._scriptArgs = scriptArgs
+        self._scriptArgsStr = (
+            ' '.join(map(str, scriptArgs)) if scriptArgs else '')
 
     def schedule(self):
         """
@@ -80,8 +82,6 @@ class SlurmPipeline(object):
             for taskName, jobIds in self.steps[stepName]['tasks'].items():
                 taskDependencies[taskName].update(jobIds)
 
-        scriptArgs = ' '.join(self._scriptArgs) if self._scriptArgs else ''
-
         if taskDependencies:
             if 'collect' in step:
                 # This step is a 'collector'. I.e., it is dependent on all
@@ -90,14 +90,13 @@ class SlurmPipeline(object):
                 # it about all job ids for all tasks that are depended on.
                 env = environ.copy()
                 env.update({
-                    'SP_ORIGINAL_ARGS': scriptArgs,
+                    'SP_ORIGINAL_ARGS': self._scriptArgsStr,
                     'SP_DEPENDENCY_ARG': '--dependency=' + ','.join(
                         sorted(('afterok:%d' % jobId)
                                for jobIds in taskDependencies.values()
                                for jobId in jobIds)),
-                    'SP_TASK_NAMES': ' '.join(sorted(taskDependencies)),
                 })
-                self._runStepScript(step, env)
+                self._runStepScript(step, sorted(taskDependencies), env)
             else:
                 # The script for this step gets run once for each task in the
                 # steps it depends on.
@@ -105,34 +104,37 @@ class SlurmPipeline(object):
                     jobIds = self.steps[stepName]['tasks'][taskName]
                     env = environ.copy()
                     env.update({
-                        'SP_ORIGINAL_ARGS': scriptArgs,
+                        'SP_ORIGINAL_ARGS': self._scriptArgsStr,
                         'SP_DEPENDENCY_ARG': '--dependency=' + (
                             ','.join(sorted(('afterok:%d' % jobId)
                                             for jobId in jobIds))),
-                        'SP_TASK_NAME': taskName,
                     })
-                    self._runStepScript(step, env)
+                    self._runStepScript(step, [taskName], env)
         else:
-            # There are no dependencies. Run the script with no setting for
-            # the environment variables.
+            # Either this step has no dependencies or the steps it is
+            # dependent on did not start any tasks. If there are no
+            # dependencies, run the script with the originally passed
+            # command line arguments. If there were dependencies but no
+            # tasks have been started, run with no command line arguments.
+            if 'dependencies' in step or self._scriptArgs is None:
+                args = []
+            else:
+                args = list(map(str, self._scriptArgs))
             env = environ.copy()
-            env['SP_ORIGINAL_ARGS'] = scriptArgs
-            for key in 'SP_TASK_NAME', 'SP_TASK_NAMES', 'SP_DEPENDENCY_ARG':
-                env.pop(key, None)
-            self._runStepScript(step, env, hasDependencies=False)
+            env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
+            env.pop('SP_DEPENDENCY_ARG', None)
+            self._runStepScript(step, args, env)
 
         step['scheduledAt'] = time()
 
-    def _runStepScript(self, step, env, hasDependencies=True):
+    def _runStepScript(self, step, args, env):
         """
         Run the script for a step, using a given environment and parse its
         output for tasks it scheduled via sbatch.
 
         @param step: A C{dict} with a job specification.
         @param env: A C{str} key to C{str} value environment for the script.
-        @param hasDependencies: If C{True} the step has dependencies and will
-            be run with no command line arguments. Otherwise, command line
-            arguments (in self._scriptArgs) will be passed to the script.
+        @param args: A C{list} of command-line arguments.
         @raise SchedulingError: If a script outputs a task name more than once.
         """
         script = step['script']
@@ -141,7 +143,7 @@ class SlurmPipeline(object):
         except KeyError:
             # No working directory was given. Run the script from our
             # current directory.
-            cwd = step['cwd'] = '.'
+            cwd = '.'
         else:
             # A working directory was given, so make sure we have an
             # absolute path to the script so we can run it from that
@@ -149,15 +151,8 @@ class SlurmPipeline(object):
             if not path.isabs(script):
                 script = path.abspath(script)
 
-        args = [script]
-
-        # If this step has no dependencies and there are some script
-        # arguments, add them to its command line.
-        if not hasDependencies and self._scriptArgs:
-            args.extend(self._scriptArgs)
-
         step['stdout'] = subprocess.check_output(
-            args, cwd=cwd, env=env, universal_newlines=True)
+            [script] + args, cwd=cwd, env=env, universal_newlines=True)
 
         # Look at all output lines for task names and SLURM job ids created
         # (if any) by this script. Ignore any non-matching output.

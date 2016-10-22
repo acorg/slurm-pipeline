@@ -460,26 +460,6 @@ class TestRunner(TestCase):
 
     @patch('os.access')
     @patch('os.path.exists')
-    def testStepImplicitCwd(self, existsMock, accessMock):
-        """
-        When a step script is scheduled and no current working directory (cwd)
-        is explicitly set, the cwd must be '.'.
-        """
-        with patch.object(subprocess, 'check_output', return_value=''):
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': '/usr/local/bin/script',
-                        },
-                    ],
-                })
-            runner.schedule()
-            self.assertEqual('.', runner.steps['name1']['cwd'])
-
-    @patch('os.access')
-    @patch('os.path.exists')
     def testStepStdout(self, existsMock, accessMock):
         """
         When a step script is scheduled its standard output must be stored.
@@ -600,25 +580,22 @@ class TestRunner(TestCase):
                 # /bin/script2 is run twice because it depends on
                 # 'name1', which starts two jobs (and name2 is not a
                 # collector step).
-                call(['/bin/script2'], cwd='.', universal_newlines=True,
+                call(['/bin/script2', 'aaa'], cwd='.', universal_newlines=True,
                      env=ANY),
-                call(['/bin/script2'], cwd='.', universal_newlines=True,
+                call(['/bin/script2', 'bbb'], cwd='.', universal_newlines=True,
                      env=ANY),
             ])
 
             # Check that the two environment variables are correct in
             # all calls.
             env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertNotIn('SP_TASK_NAME', env1)
             self.assertNotIn('SP_DEPENDENCY_ARG', env1)
 
             env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertEqual('aaa', env2['SP_TASK_NAME'])
             self.assertEqual('--dependency=afterok:127,afterok:450',
                              env2['SP_DEPENDENCY_ARG'])
 
             env3 = mockMethod.mock_calls[2][2]['env']
-            self.assertEqual('bbb', env3['SP_TASK_NAME'])
             self.assertEqual('--dependency=afterok:238,afterok:560',
                              env3['SP_DEPENDENCY_ARG'])
 
@@ -705,26 +682,27 @@ class TestRunner(TestCase):
             mockMethod.assert_has_calls([
                 call(['script1'], cwd='.', universal_newlines=True, env=ANY),
                 call(['script2'], cwd='.', universal_newlines=True, env=ANY),
-                call(['script3'], cwd='.', universal_newlines=True, env=ANY),
+                call(['script3', 'aaa', 'bbb', 'xxx', 'yyy'], cwd='.',
+                     universal_newlines=True, env=ANY),
             ])
 
             # Check that the environment variables we set were correct
             # in all calls.
             env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertNotIn('SP_TASK_NAME', env1)
             self.assertNotIn('SP_DEPENDENCY_ARG', env1)
+            self.assertEqual('', env1['SP_ORIGINAL_ARGS'])
 
             env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertNotIn('SP_TASK_NAME', env2)
             self.assertNotIn('SP_DEPENDENCY_ARG', env2)
+            self.assertEqual('', env2['SP_ORIGINAL_ARGS'])
 
             env3 = mockMethod.mock_calls[2][2]['env']
-            self.assertEqual('aaa bbb xxx yyy', env3['SP_TASK_NAMES'])
             self.assertEqual(
                 ('--dependency='
                  'afterok:123,afterok:127,afterok:234,afterok:238,'
                  'afterok:450,afterok:456,afterok:560,afterok:567'),
                 env3['SP_DEPENDENCY_ARG'])
+            self.assertEqual('', env3['SP_ORIGINAL_ARGS'])
 
     @patch('os.path.abspath')
     @patch('os.access')
@@ -739,7 +717,7 @@ class TestRunner(TestCase):
         abspathMock.return_value = '/fictional/path'
 
         with patch.object(subprocess, 'check_output') as mockMethod:
-            mockMethod.return_value = 'hey\n'
+            mockMethod.return_value = ''
             runner = SlurmPipeline(
                 {
                     'steps': [
@@ -756,3 +734,80 @@ class TestRunner(TestCase):
                 call(['/fictional/path'], cwd='/tmp', universal_newlines=True,
                      env=ANY),
             ])
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testScriptArgs(self, existsMock, accessMock):
+        """
+        If script arguments are given to SlurmPipeline, they must be passed
+        to the executed scripts that have no dependencies. Steps that have
+        dependencies must be called with the name of the task on the command
+        line and the correct job numbers.
+        """
+
+        class SideEffect(object):
+            def __init__(self):
+                self.count = 0
+
+            def sideEffect(self, *args, **kwargs):
+                self.count += 1
+                if self.count == 1:
+                    return ('TASK: aaa 127 450\n'
+                            'TASK: bbb 238 560\n')
+                else:
+                    return '\n'
+
+        sideEffect = SideEffect()
+
+        with patch.object(subprocess, 'check_output') as mockMethod:
+            mockMethod.side_effect = sideEffect.sideEffect
+            runner = SlurmPipeline(
+                {
+                    'steps': [
+                        {
+                            'name': 'name1',
+                            'script': 'script1',
+                        },
+                        {
+                            'name': 'name2',
+                            'script': 'script2',
+                        },
+                        {
+                            'dependencies': ['name1'],
+                            'name': 'name3',
+                            'script': 'script3',
+                        },
+                    ],
+                }, scriptArgs=['hey', 3])
+            runner.schedule()
+
+            mockMethod.assert_has_calls([
+                call(['script1', 'hey', '3'], cwd='.', universal_newlines=True,
+                     env=ANY),
+                call(['script2', 'hey', '3'], cwd='.', universal_newlines=True,
+                     env=ANY),
+                call(['script3', 'aaa'], cwd='.', universal_newlines=True,
+                     env=ANY),
+                call(['script3', 'bbb'], cwd='.', universal_newlines=True,
+                     env=ANY),
+            ])
+
+            # Check that the environment variables we set were correct
+            # in all calls.
+            env1 = mockMethod.mock_calls[0][2]['env']
+            self.assertNotIn('SP_DEPENDENCY_ARG', env1)
+            self.assertEqual('hey 3', env1['SP_ORIGINAL_ARGS'])
+
+            env2 = mockMethod.mock_calls[1][2]['env']
+            self.assertNotIn('SP_DEPENDENCY_ARG', env2)
+            self.assertEqual('hey 3', env2['SP_ORIGINAL_ARGS'])
+
+            env3 = mockMethod.mock_calls[2][2]['env']
+            self.assertEqual('--dependency=afterok:127,afterok:450',
+                             env3['SP_DEPENDENCY_ARG'])
+            self.assertEqual('hey 3', env3['SP_ORIGINAL_ARGS'])
+
+            env3 = mockMethod.mock_calls[3][2]['env']
+            self.assertEqual('--dependency=afterok:238,afterok:560',
+                             env3['SP_DEPENDENCY_ARG'])
+            self.assertEqual('hey 3', env3['SP_ORIGINAL_ARGS'])

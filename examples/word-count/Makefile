@@ -2,6 +2,7 @@
 
 run:
 	@test -e output || mkdir output
+	rm -f output/*
 	../../bin/slurm-pipeline.py -s specification.json texts/*.txt
 
 sh:

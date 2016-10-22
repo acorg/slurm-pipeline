@@ -1,3 +1,5 @@
 _trial_temp
 examples/word-count/output
 __pycache__
+dist
+slurm_pipeline.egg-info
