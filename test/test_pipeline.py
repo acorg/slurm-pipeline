@@ -463,7 +463,7 @@ class TestRunner(TestCase):
     def testStepImplicitCwd(self, existsMock, accessMock):
         """
         When a step script is scheduled and no current working directory (cwd)
-        is explicitly set, the cwd must be taken as the dirname of the script.
+        is explicitly set, the cwd must be '.'.
         """
         with patch.object(subprocess, 'check_output', return_value=''):
             runner = SlurmPipeline(
@@ -476,8 +476,7 @@ class TestRunner(TestCase):
                     ],
                 })
             runner.schedule()
-            self.assertEqual('/usr/local/bin',
-                             runner.steps['name1']['cwd'])
+            self.assertEqual('.', runner.steps['name1']['cwd'])
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -566,7 +565,6 @@ class TestRunner(TestCase):
                 {
                     'steps': [
                         {
-                            'cwd': '/tmp',
                             'name': 'name1',
                             'script': 'script1',
                         },
@@ -598,14 +596,13 @@ class TestRunner(TestCase):
                 runner.steps['name2']['taskDependencies'])
 
             mockMethod.assert_has_calls([
-                call(['script1'], cwd='/tmp', universal_newlines=True,
-                     env=ANY),
+                call(['script1'], cwd='.', universal_newlines=True, env=ANY),
                 # /bin/script2 is run twice because it depends on
                 # 'name1', which starts two jobs (and name2 is not a
                 # collector step).
-                call(['/bin/script2'], cwd='/bin', universal_newlines=True,
+                call(['/bin/script2'], cwd='.', universal_newlines=True,
                      env=ANY),
-                call(['/bin/script2'], cwd='/bin', universal_newlines=True,
+                call(['/bin/script2'], cwd='.', universal_newlines=True,
                      env=ANY),
             ])
 
@@ -728,3 +725,34 @@ class TestRunner(TestCase):
                  'afterok:123,afterok:127,afterok:234,afterok:238,'
                  'afterok:450,afterok:456,afterok:560,afterok:567'),
                 env3['SP_DEPENDENCY_ARG'])
+
+    @patch('os.path.abspath')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testCwdWithRelativeScriptPath(self, existsMock, accessMock,
+                                      abspathMock):
+        """
+        If a step has a cwd set and its script is a relative path, the path of
+        the executed script that is executed must be adjusted to be absolute.
+        """
+
+        abspathMock.return_value = '/fictional/path'
+
+        with patch.object(subprocess, 'check_output') as mockMethod:
+            mockMethod.return_value = 'hey\n'
+            runner = SlurmPipeline(
+                {
+                    'steps': [
+                        {
+                            'cwd': '/tmp',
+                            'name': 'name1',
+                            'script': 'script1',
+                        },
+                    ],
+                })
+            runner.schedule()
+
+            mockMethod.assert_has_calls([
+                call(['/fictional/path'], cwd='/tmp', universal_newlines=True,
+                     env=ANY),
+            ])

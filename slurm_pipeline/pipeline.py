@@ -80,9 +80,6 @@ class SlurmPipeline(object):
             for taskName, jobIds in self.steps[stepName]['tasks'].items():
                 taskDependencies[taskName].update(jobIds)
 
-        # print('Scheduling step %r' % step['name'])
-        # print('Task dependencies %r' % taskDependencies)
-
         scriptArgs = ' '.join(self._scriptArgs) if self._scriptArgs else ''
 
         if taskDependencies:
@@ -114,8 +111,6 @@ class SlurmPipeline(object):
                                             for jobId in jobIds))),
                         'SP_TASK_NAME': taskName,
                     })
-                    # print('Running step %r on task %r with %s' %
-                    # (step['name'], taskName, environ['SP_DEPENDENCY_ARG']))
                     self._runStepScript(step, env)
         else:
             # There are no dependencies. Run the script with no setting for
@@ -140,7 +135,6 @@ class SlurmPipeline(object):
             arguments (in self._scriptArgs) will be passed to the script.
         @raise SchedulingError: If a script outputs a task name more than once.
         """
-        # print('Running step script for %r' % step['name'])
         script = step['script']
         try:
             cwd = step['cwd']

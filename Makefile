@@ -1,4 +1,4 @@
-.PHONY: check, tcheck, pep8, pyflakes, lint, wc, clean, clobber
+.PHONY: check, tcheck, pep8, pyflakes, lint, wc, clean, clobber, upload
 
 check:
 	python -m discover -v
@@ -24,5 +24,6 @@ clean:
 	python setup.py clean
 	make -C examples/word-count $@
 
-clobber: clean
-	rm -fr .tox
+# The upload target requires that you have access rights to PYPI.
+upload:
+	python setup.py sdist upload
