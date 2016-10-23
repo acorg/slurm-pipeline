@@ -1,0 +1,19 @@
+{
+    "steps": [
+        {
+            "name": "split",
+            "script": "split-fasta.sh"
+        },
+        {
+            "dependencies": ["split"],
+            "name": "blast",
+            "script": "run-blast.sh"
+        },
+        {
+            "collect": true,
+            "dependencies": ["blast"],
+            "name": "collect",
+            "script": "collect.sh"
+        }
+    ]
+}
