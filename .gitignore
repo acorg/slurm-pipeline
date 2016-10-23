@@ -3,3 +3,7 @@ examples/word-count/output
 __pycache__
 dist
 slurm_pipeline.egg-info
+examples/blast/x??
+examples/blast/x??.blast-out
+examples/blast/BEST-HITS
+examples/blast/pipeline.log
