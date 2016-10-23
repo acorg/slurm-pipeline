@@ -22,7 +22,9 @@ clean:
 	find . -name '__pycache__' -type d -print0 | xargs -0 rmdir
 	find . -name '_trial_temp' -type d -print0 | xargs -0 rm -r
 	python setup.py clean
+	rm -fr slurm_pipeline.egg-info dist
 	make -C examples/word-count $@
+	make -C examples/blast $@
 
 # The upload target requires that you have access rights to PYPI.
 upload:
