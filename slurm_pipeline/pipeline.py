@@ -152,7 +152,8 @@ class SlurmPipeline(object):
                 script = path.abspath(script)
 
         step['stdout'] = subprocess.check_output(
-            [script] + args, cwd=cwd, env=env, universal_newlines=True)
+            [script] + args, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+            universal_newlines=True)
 
         # Look at all output lines for task names and SLURM job ids created
         # (if any) by this script. Ignore any non-matching output.
