@@ -15,7 +15,7 @@ pyflakes:
 lint: pep8 pyflakes
 
 wc:
-	find . -path './.tox' -prune -o -path './build' -prune -o -path './dist' -prune -o -name '*.py' -print0 | xargs -0 wc -l
+	find . -path './.tox' -prune -o -path './build' -prune -o -path './dist' -prune -o \( -name '*.py' -o -name '*.sh' \) -print0 | xargs -0 wc -l
 
 clean:
 	find . \( -name '*.pyc' -o -name '*~' \) -print0 | xargs -0 rm

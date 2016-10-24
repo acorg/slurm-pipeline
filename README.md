@@ -103,7 +103,7 @@ So for example, given the specification above,
 
 ```sh
 $ cd examples/word-count
-$ slurm-pipeline.py -s specification.json texts/*.txt
+$ slurm-pipeline.py -s specification.json texts/*.txt > status.json
 ```
 
 will cause `one-word-per-line.sh` from the first specification step to be
@@ -116,6 +116,12 @@ of the third step (`summarize.sh`) will be called with the names of *all*
 the tasks emitted by its dependency (the second script).
 
 The standard input of invoked scripts is closed.
+
+The file `status.json` produced by the above will contain the original
+specification, updated to contain information about the tasks that have
+been scheduled, their SLURM job ids, script output, timestamps, etc. See
+the `word-count` example below for sample output (and the TODO section for
+plans for using the updated specification).
 
 #### Script environment variables
 
@@ -144,7 +150,6 @@ line like `Submitted batch job 3779695`) and the `cut` in the above pulls
 out just the job id. The task name is then emitted, along wtih the job id.
 
 A task name may be emitted multiple times by the same script.
-
 
 ### Separation of concerns
 
@@ -187,7 +192,7 @@ directory. You can run the example via
 $ cd examples/word-count
 $ make
 rm -f output/*
-../../bin/slurm-pipeline.py -s specification.json texts/*.txt
+../../bin/slurm-pipeline.py -s specification.json texts/*.txt > status.json
 ```
 
 This example is more verbose in its output than would be typical. Here's
@@ -216,9 +221,97 @@ scripts. The `.words` and `.long-words` files are intermediates made by
 scripts. The intermediate files of one step would normally be cleaned up
 after being used by a subsequent step.
 
-If you want to check the processing, run `make sh` to see the same thing
-done in a shell pipeline. The output should be identical to that in
-`MOST-FREQUENT-WORDS`.
+If you want to check the processing of this pipeline, run `make sh` to see
+the same thing done in a normal UNIX shell pipeline. The output should be
+identical to that in `MOST-FREQUENT-WORDS`.
+
+The file `status.json` produced by the above command contains an updated
+status:
+
+```json
+{
+  "scheduledAt": 1477302666.246372,
+  "steps": [
+    {
+      "name": "one-per-line",
+      "scheduledAt": 1477302666.271217,
+      "script": "scripts/one-word-per-line.sh",
+      "stdout": "TASK: 1-karamazov 20132\nTASK: 2-trial 3894\nTASK: 3-ulysses 13586\n",
+      "taskDependencies": {},
+      "tasks": {
+        "1-karamazov": [
+          20132
+        ],
+        "2-trial": [
+          3894
+        ],
+        "3-ulysses": [
+          13586
+        ]
+      }
+    },
+    {
+      "dependencies": [
+        "one-per-line"
+      ],
+      "name": "long-words",
+      "scheduledAt": 1477302666.300458,
+      "script": "scripts/long-words-only.sh",
+      "stdout": "TASK: 3-ulysses 31944\n",
+      "taskDependencies": {
+        "1-karamazov": [
+          20132
+        ],
+        "2-trial": [
+          3894
+        ],
+        "3-ulysses": [
+          13586
+        ]
+      },
+      "tasks": {
+        "1-karamazov": [
+          27401
+        ],
+        "2-trial": [
+          13288
+        ],
+        "3-ulysses": [
+          31944
+        ]
+      }
+    },
+    {
+      "collect": true,
+      "dependencies": [
+        "long-words"
+      ],
+      "name": "summarize",
+      "scheduledAt": 1477302666.319238,
+      "script": "scripts/summarize.sh",
+      "stdout": "",
+      "taskDependencies": {
+        "1-karamazov": [
+          27401
+        ],
+        "2-trial": [
+          13288
+        ],
+        "3-ulysses": [
+          31944
+        ]
+      },
+      "tasks": {}
+    }
+  ]
+}
+```
+
+Each step in the output specification has a `tasks` key that holds the taks
+that the step has scheduled and a `taskDependencies` key that holds the
+tasks the step depends on.  Note that the job ids will differ on your
+machine due to the use of the `$RANDOM` variable to make fake job id
+numbers in the pipeline scripts.
 
 #### Simulated BLAST
 
@@ -248,17 +341,23 @@ the `examples` directory.
 
 ## TODO
 
-* `slurm-pipeline.py` should print the updated specification following scheduling.
-  This contains script output, task information, SLURM job ids, scheduling
-  timestamps, etc.
-* Make `slurm-pipeline.py` be able to accept an in-progress specification
+* Make `slurm-pipeline.py` able to accept an in-progress specification
   so it can report on output, tasks, job ids, completion, timing, etc.
-* Make it possible to pass the names of the two environment variables to
+* Add `--first-step` and `--last-step` (or similar) options to
+  `slurm-pipeline.py` to have it only execute a subset of the steps in a
+  specification. This will require an in-progress specification because
+  earlier processing may still be in process, and so dependency information
+  is needed. The job ids of dependent tasks are in the specification.
+* Make it possible to pass the names of the two environment variables
+  (currently hard-coded as `SP_ORIGINAL_ARGS` and `SP_DEPENDENCY_ARG`) to
   the `SlurmPipeline` constructor.
 * Make it possible to pass a regex for matching task name and job id lines
   in a script's stdout to the `SlurmPipeline` constructor (instead of
   using the currently hard-coded `TASK: name jobid1 jobid2`).
+* (Possibly) arrange things so that scripts can write their task lines to
+  file descriptor 3 so as not to interfere with whatever they might
+  otherwise produce on `stdout` (or `stderr`).
+* Separate treatment of `stdout` and `stderr` from scripts.
 * Allow for steps to be error-processing ones, that handle failures in
   their dependencies. Or allow a step to have both success and failure
   scripts.
-* Better treatment of `stdout` and `stderr` from scripts.

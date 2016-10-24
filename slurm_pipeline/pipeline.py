@@ -3,7 +3,7 @@ from os import path, environ
 import re
 from time import time
 from six import string_types
-from json import load
+from json import load, dumps
 import subprocess
 from collections import defaultdict
 
@@ -253,3 +253,17 @@ class SlurmPipeline(object):
                         raise SpecificationError(
                             'Step %d depends on a non-existent (or '
                             'not-yet-defined) step: %r' % (count, dependency))
+
+    def toJSON(self):
+        """
+        Return the specification as a JSON string.
+
+        @return: A C{str} giving the specification in JSON form.
+        """
+        copy = self.specification.copy()
+        for step in copy['steps']:
+            for taskName, jobIds in step['tasks'].items():
+                step['tasks'][taskName] = list(sorted(jobIds))
+            for taskName, jobIds in step['taskDependencies'].items():
+                step['taskDependencies'][taskName] = list(sorted(jobIds))
+        return dumps(copy, sort_keys=True, indent=2, separators=(',', ': '))

@@ -16,4 +16,7 @@ parser.add_argument(
 
 args, scriptArgs = parser.parse_known_args()
 
-SlurmPipeline(args.specification, scriptArgs=scriptArgs).schedule()
+sp = SlurmPipeline(args.specification, scriptArgs=scriptArgs)
+sp.schedule()
+
+print(sp.toJSON())
