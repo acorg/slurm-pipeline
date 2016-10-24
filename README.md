@@ -6,8 +6,9 @@ A Python class for scheduling [SLURM](http://slurm.schedmd.com/)
 ## Operation
 
 This repo contains a Python script, `bin/slurm-pipeline.py` that can
-schedule programs and/or scripts to be run in an organized pipeline
-fashion. I.e., with an understanding of dependencies.
+schedule programs to be run in an organized pipeline fashion on a Linux
+cluster that uses SLURM as a workload manager. Here "pipeline", means with
+an understanding of possibly complex inter-program dependencies.
 
 A pipeline run is schedule according to a specification file in JSON
 format. A couple of these can be seen in the `examples` directory of the
@@ -35,8 +36,8 @@ repo. Here's an example,  `examples/word-count/specification.json`:
 }
 ```
 
-This example contains almost everything you need to know to set up your own
-pipeline specification.
+The specification above contains almost everything you need to know to set
+up your own pipeline, though you of course still have to write the scripts.
 
 ### Steps
 
