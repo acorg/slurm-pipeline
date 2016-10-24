@@ -55,8 +55,8 @@ names upon which the step depends. Any dependency named must have already
 been defined in the specification.
 
 Optionally, a script may specify `collect` with a `true` value. This will
-cause the script to be run when all the *tasks* started by earlier
-dependent steps have completed.
+cause the script to be run when all the *tasks* (see below) started by
+earlier dependent steps have completed.
 
 Optionally, a script may specify a `cwd` key with a value that is a
 directory that the script should be invoked from. If no directory is given,
