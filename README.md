@@ -1,6 +1,7 @@
 # slurm-pipeline
 
-A Python class for scheduling SLURM jobs.
+A Python class for scheduling [SLURM](http://slurm.schedmd.com/)
+([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
 ## Operation
 
