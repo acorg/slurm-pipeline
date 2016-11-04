@@ -19,9 +19,25 @@ parser.add_argument(
     help=('If specified, indicate to step scripts that they may overwrite '
           'pre-existing results files.'))
 
+parser.add_argument(
+    '--firstStep', metavar='step-name', default=None,
+    help=('The name of the first specification step to execute. Earlier '
+          'steps will actually be executed but they will have SP_SIMULATE=1 '
+          'in their environment, allowing them to skip doing actual work '
+          '(while still emitting task names without job numbers so that '
+          'later steps receive the correct tasks to operate on).'))
+
+parser.add_argument(
+    '--lastStep', metavar='step-name', default=None,
+    help=('The name of the last specification step to execute. See the '
+          'help text for --first-step for how this affects the environment '
+          'in which step scripts are executed.'))
+
 args, scriptArgs = parser.parse_known_args()
 
-sp = SlurmPipeline(args.specification, args.force, scriptArgs=scriptArgs)
+sp = SlurmPipeline(args.specification, force=args.force,
+                   firstStep=args.firstStep, lastStep=args.lastStep,
+                   scriptArgs=scriptArgs)
 sp.schedule()
 
 print(sp.toJSON())

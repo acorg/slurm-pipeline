@@ -125,12 +125,16 @@ plans for using the updated specification).
 
 #### Script environment variables
 
-Two environment variables are set when a step's script is exectued:
+The following environment variables are set when a step's script is
+exectued:
 
 * `SP_ORIGINAL_ARGS` contains the (space-separated) list of arguments
   originally passed to `slurm-pipeline.py`. Most scripts will not need to
-  know this information, but it might be useful. Scripts with no
-  dependencies get these arguments on the command line too.
+  know this information, but it might be useful. Scripts that have no
+  dependencies will be run with these arguments on the command line too.
+  Note that if an original command-line argument contained a space, and you
+  split `SP_ORIGINAL_ARGS` on spaces, you'll have two strings instead of
+  one.
 * `SP_FORCE` will be set to `1` if `--force` is given on the
   `slurm-pipeline.py` command line. This can be used to inform step scripts
   that they may overwrite pre-existing result files if they wish. If
@@ -139,6 +143,15 @@ Two environment variables are set when a step's script is exectued:
   invokes `sbatch` to guarantee that the execution of the script does not
   begin until after the tasks from all dependent steps have finished
   successfully.
+* `SP_SIMULATE` will be set to `1` if the step should be simulated, and `0`
+  if not. In simulating a step, a script should just emit its task name(s)
+  as usual, but without job ids. The presumption is that a pipeline is
+  being re-run and that the work that would normally be done by a step that
+  is now being simulated has already been done. A script that is called
+  with `SP_SIMULATE=1` might want to check that its regular output does in
+  fact already exist, but there's no need to exit if not. The entire
+  pipeline might be simulated, in which case there is no issue if
+  intermediate results are never computed.
 
 The canonical way to use `SP_DEPENDENCY_ARG` in a step script is as
 follows:
@@ -333,6 +346,24 @@ All the action takes place in the same directory and all intermediate files
 are removed along the way (uncomment the clean up `rm` line in
 `2-run-blast.sh` and `3-collect.sh` and re-run to see the 200 intermediate
 files).
+
+#### Simulated BLAST with --force and --firstStep
+
+`examples/blast-with-force-and-simulate` simulates the running of
+[BLAST](https://blast.ncbi.nlm.nih.gov/Blast.cgi) on a FASTA file, as
+above.
+
+In this case the step scripts take the values of `SP_FORCE` and
+`SP_SIMULATE` into account.
+
+As in the `examples/blast` example, all the action takes place in the same
+directory, but intermediate files are not removed along the way. This
+allows the step scripts to avoid doing work when `SP_SIMULATE=1` and to
+detect whether their output already exists, etc. A detailed log of the
+actions taken is written to `pipeline.log`.
+
+The `Makefile` has some convenient targets: `run`, `rerun`, and
+`force`. Use `make clean` to get rid of the intermediate files.
 
 #### A more realistic example
 

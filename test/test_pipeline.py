@@ -298,6 +298,65 @@ class TestRunner(TestCase):
 
     @patch('os.access')
     @patch('os.path.exists')
+    def testNonexistentFirstStep(self, existsMock, accessMock):
+        """
+        If SlurmPipeline is passed a firstStep value that doesn't match
+        any of the specification steps, a SpecificationError must be raised.
+        """
+        error = "^The firstStep 'xxx' was not found in the specification$"
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
+                          {
+                              'steps': [
+                                  {
+                                      'name': 'name1',
+                                      'script': 'script',
+                                  },
+                              ]
+                          }, firstStep='xxx')
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testNonexistentLastStep(self, existsMock, accessMock):
+        """
+        If SlurmPipeline is passed a lastStep value that doesn't match
+        any of the specification steps, a SpecificationError must be raised.
+        """
+        error = "^The lastStep 'xxx' was not found in the specification$"
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
+                          {
+                              'steps': [
+                                  {
+                                      'name': 'name1',
+                                      'script': 'script',
+                                  },
+                              ]
+                          }, lastStep='xxx')
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testLastStepBeforeFirstStep(self, existsMock, accessMock):
+        """
+        If SlurmPipeline is passed a lastStep value that occurs before the
+        first step, a SpecificationError must be raised.
+        """
+        error = ("^The lastStep 'name1' occurs before the firstStep 'name2' "
+                 "in the specification$")
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
+                          {
+                              'steps': [
+                                  {
+                                      'name': 'name1',
+                                      'script': 'script',
+                                  },
+                                  {
+                                      'name': 'name2',
+                                      'script': 'script',
+                                  },
+                              ]
+                          }, firstStep='name2', lastStep='name1')
+
+    @patch('os.access')
+    @patch('os.path.exists')
     def testSpecificationIsStored(self, existsMock, accessMock):
         """
         If well-formed JSON is passed, it must be read and stored as the
@@ -319,6 +378,13 @@ class TestRunner(TestCase):
         mockOpener = mockOpen(read_data=data)
         with patch.object(builtins, 'open', mockOpener):
             runner = SlurmPipeline('file')
+            # Add keys to the expected specification to match what
+            # SlurmPipeline.__init__ does.
+            specification.update({
+                'force': False,
+                'firstStep': None,
+                'lastStep': None,
+            })
             self.assertEqual(specification, runner.specification)
 
     def testScheduledTime(self):
@@ -934,3 +1000,149 @@ class TestRunner(TestCase):
 
             env = mockMethod.mock_calls[0][2]['env']
             self.assertEqual('1', env['SP_FORCE'])
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testFirstStep(self, existsMock, accessMock):
+        """
+        If firstStep is specified for a SlurmPipeline the correct SP_SIMULATE
+        value must be set in the environment.
+        """
+        with patch.object(
+                subprocess, 'check_output', return_value='') as mockMethod:
+            runner = SlurmPipeline(
+                {
+                    'steps': [
+                        {
+                            'name': 'name1',
+                            'script': 'script1',
+                        },
+                        {
+                            'name': 'name2',
+                            'script': 'script2',
+                        },
+                    ],
+                }, firstStep='name2')
+            runner.schedule()
+
+            mockMethod.assert_has_calls([
+                call(['script1'], cwd='.', universal_newlines=True,
+                     stdin=subprocess.DEVNULL, env=ANY),
+                call(['script2'], cwd='.', universal_newlines=True,
+                     stdin=subprocess.DEVNULL, env=ANY),
+            ])
+
+            # Check that the SP_SIMULATE environment variable is correct in
+            # all calls.
+            env1 = mockMethod.mock_calls[0][2]['env']
+            self.assertEqual('1', env1['SP_SIMULATE'])
+
+            env2 = mockMethod.mock_calls[1][2]['env']
+            self.assertEqual('0', env2['SP_SIMULATE'])
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testFirstStepAndLastStepDifferent(self, existsMock, accessMock):
+        """
+        If firstStep and lastStep are specified for a SlurmPipeline and the
+        steps are not the same, the correct SP_SIMULATE value must be set
+        correctly in the environment.
+        """
+        with patch.object(
+                subprocess, 'check_output', return_value='') as mockMethod:
+            runner = SlurmPipeline(
+                {
+                    'steps': [
+                        {
+                            'name': 'name1',
+                            'script': 'script1',
+                        },
+                        {
+                            'name': 'name2',
+                            'script': 'script2',
+                        },
+                        {
+                            'name': 'name3',
+                            'script': 'script3',
+                        },
+                        {
+                            'name': 'name4',
+                            'script': 'script4',
+                        },
+                    ],
+                }, firstStep='name2', lastStep='name3')
+            runner.schedule()
+
+            mockMethod.assert_has_calls([
+                call(['script1'], cwd='.', universal_newlines=True,
+                     stdin=subprocess.DEVNULL, env=ANY),
+                call(['script2'], cwd='.', universal_newlines=True,
+                     stdin=subprocess.DEVNULL, env=ANY),
+                call(['script3'], cwd='.', universal_newlines=True,
+                     stdin=subprocess.DEVNULL, env=ANY),
+                call(['script4'], cwd='.', universal_newlines=True,
+                     stdin=subprocess.DEVNULL, env=ANY),
+            ])
+
+            # Check that the SP_SIMULATE environment variable is correct in
+            # all calls.
+            env1 = mockMethod.mock_calls[0][2]['env']
+            self.assertEqual('1', env1['SP_SIMULATE'])
+
+            env2 = mockMethod.mock_calls[1][2]['env']
+            self.assertEqual('0', env2['SP_SIMULATE'])
+
+            env3 = mockMethod.mock_calls[2][2]['env']
+            self.assertEqual('0', env3['SP_SIMULATE'])
+
+            env4 = mockMethod.mock_calls[3][2]['env']
+            self.assertEqual('1', env4['SP_SIMULATE'])
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testFirstStepAndLastStepSame(self, existsMock, accessMock):
+        """
+        If firstStep and lastStep are specified for a SlurmPipeline and the
+        steps are the same, the correct SP_SIMULATE value must be set
+        correctly in the environment.
+        """
+        with patch.object(
+                subprocess, 'check_output', return_value='') as mockMethod:
+            runner = SlurmPipeline(
+                {
+                    'steps': [
+                        {
+                            'name': 'name1',
+                            'script': 'script1',
+                        },
+                        {
+                            'name': 'name2',
+                            'script': 'script2',
+                        },
+                        {
+                            'name': 'name3',
+                            'script': 'script3',
+                        },
+                    ],
+                }, firstStep='name2', lastStep='name2')
+            runner.schedule()
+
+            mockMethod.assert_has_calls([
+                call(['script1'], cwd='.', universal_newlines=True,
+                     stdin=subprocess.DEVNULL, env=ANY),
+                call(['script2'], cwd='.', universal_newlines=True,
+                     stdin=subprocess.DEVNULL, env=ANY),
+                call(['script3'], cwd='.', universal_newlines=True,
+                     stdin=subprocess.DEVNULL, env=ANY),
+            ])
+
+            # Check that the SP_SIMULATE environment variable is correct in
+            # all calls.
+            env1 = mockMethod.mock_calls[0][2]['env']
+            self.assertEqual('1', env1['SP_SIMULATE'])
+
+            env2 = mockMethod.mock_calls[1][2]['env']
+            self.assertEqual('0', env2['SP_SIMULATE'])
+
+            env3 = mockMethod.mock_calls[2][2]['env']
+            self.assertEqual('1', env3['SP_SIMULATE'])

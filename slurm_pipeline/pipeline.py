@@ -27,10 +27,19 @@ class SlurmPipeline(object):
 
     @param specification: Either a C{str} giving the name of a file containing
         a JSON execution specification, or a C{dict} holding a correctly
-        formatted execution specification.
+        formatted execution specification. Note that in the latter case the
+        passed specification C{dict} will be modified by this script.
     @param force: If C{True}, step scripts will be told (via the environment
         variable SP_FORCE=1) that they may overwrite pre-existing result files.
         I.e., that --force was used on the slurm-pipeline.py command line.
+    @param firstStep: If not C{None}, the name of the first specification step
+          to execute. Earlier steps will actually be executed but they will
+          have SP_SIMULATE=1 in their environment, allowing them to skip doing
+          actual work (while still emitting task names without job numbers so
+          that later steps receive the correct tasks to operate on.
+    @param lastStep: If not C{None}, the name of the last specification step
+          to execute. See above docs for C{firstStep} for how this affects the
+          calling of step scripts.
     @param scriptArgs: A C{list} of C{str} arguments that should be put on the
         command line of all steps that have no dependencies.
     """
@@ -41,7 +50,8 @@ class SlurmPipeline(object):
     # job ids. The following regex just matches the first part of that.
     TASK_NAME_LINE = re.compile('^TASK:\s+(\S+)\s*')
 
-    def __init__(self, specification, force=False, scriptArgs=None):
+    def __init__(self, specification, force=False, firstStep=None,
+                 lastStep=None, scriptArgs=None):
         if isinstance(specification, string_types):
             specification = self._loadSpecification(specification)
         # self.steps will be keyed by step name, with values that are
@@ -49,12 +59,17 @@ class SlurmPipeline(object):
         # access to steps by name. It is initialized in
         # self._checkSpecification.
         self.steps = {}
+        self.firstStep = firstStep
+        self.lastStep = lastStep
         self._checkSpecification(specification)
         self.specification = specification
         self._scriptArgs = scriptArgs
         self._scriptArgsStr = (
             ' '.join(map(str, scriptArgs)) if scriptArgs else '')
         environ['SP_FORCE'] = str(int(force))
+        self.specification['force'] = force
+        self.specification['firstStep'] = firstStep
+        self.specification['lastStep'] = lastStep
 
     def schedule(self):
         """
@@ -64,14 +79,42 @@ class SlurmPipeline(object):
             raise SchedulingError('Specification has already been scheduled')
         else:
             self.specification['scheduledAt'] = time()
-            for step in self.specification['steps']:
-                self._scheduleStep(step)
 
-    def _scheduleStep(self, step):
+            firstStepFound = lastStepFound = False
+
+            for step in self.specification['steps']:
+                if self.firstStep is not None:
+                    if firstStepFound:
+                        if self.lastStep is not None:
+                            if lastStepFound:
+                                simulate = True
+                            else:
+                                if step['name'] == self.lastStep:
+                                    simulate = False
+                                    lastStepFound = True
+                                else:
+                                    simulate = True
+                        else:
+                            simulate = False
+                    else:
+                        if step['name'] == self.firstStep:
+                            simulate = False
+                            firstStepFound = True
+                        else:
+                            simulate = True
+                else:
+                    simulate = False
+
+                self._scheduleStep(step, simulate)
+
+    def _scheduleStep(self, step, simulate):
         """
         Schedule a single execution step.
 
         @param step: A C{dict} with a job specification.
+        @param simulate: If C{True}, this step should be simulated. The step
+            script is still run, but with SP_SIMULATE=1 in its environment.
+            Else, SP_SIMULATE=0 will be in the environment.
         """
         assert 'scheduledAt' not in step
         assert 'tasks' not in step
@@ -94,6 +137,7 @@ class SlurmPipeline(object):
                 # it about all job ids for all tasks that are depended on.
                 env = environ.copy()
                 env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
+                env['SP_SIMULATE'] = str(int(simulate))
                 dependencies = ','.join(
                     sorted(('afterok:%d' % jobId)
                            for jobIds in taskDependencies.values()
@@ -109,6 +153,7 @@ class SlurmPipeline(object):
                 for taskName in sorted(taskDependencies):
                     env = environ.copy()
                     env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
+                    env['SP_SIMULATE'] = str(int(simulate))
                     jobIds = self.steps[stepName]['tasks'][taskName]
                     dependencies = ','.join(sorted(('afterok:%d' % jobId)
                                                    for jobId in jobIds))
@@ -130,6 +175,7 @@ class SlurmPipeline(object):
                 args = list(map(str, self._scriptArgs))
             env = environ.copy()
             env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
+            env['SP_SIMULATE'] = str(int(simulate))
             env.pop('SP_DEPENDENCY_ARG', None)
             self._runStepScript(step, args, env)
 
@@ -212,6 +258,8 @@ class SlurmPipeline(object):
         if not isinstance(specification['steps'], list):
             raise SpecificationError('The "steps" key must be a list')
 
+        firstStepFound = lastStepFound = False
+
         for count, step in enumerate(specification['steps'], start=1):
             if not isinstance(step, dict):
                 raise SpecificationError('Step %d is not a dictionary' % count)
@@ -249,6 +297,16 @@ class SlurmPipeline(object):
 
             self.steps[step['name']] = step
 
+            if step['name'] == self.firstStep:
+                firstStepFound = True
+
+            if step['name'] == self.lastStep:
+                if self.firstStep is not None and not firstStepFound:
+                    raise SpecificationError(
+                        'The lastStep %r occurs before the firstStep %r in '
+                        'the specification' % (self.lastStep, self.firstStep))
+                lastStepFound = True
+
             if 'dependencies' in step:
                 dependencies = step['dependencies']
                 if not isinstance(dependencies, list):
@@ -261,6 +319,16 @@ class SlurmPipeline(object):
                         raise SpecificationError(
                             'Step %d depends on a non-existent (or '
                             'not-yet-defined) step: %r' % (count, dependency))
+
+        if self.firstStep is not None and not firstStepFound:
+            raise SpecificationError(
+                'The firstStep %r was not found in the specification' %
+                self.firstStep)
+
+        if self.lastStep is not None and not lastStepFound:
+            raise SpecificationError(
+                'The lastStep %r was not found in the specification' %
+                self.lastStep)
 
     def toJSON(self):
         """
