@@ -28,6 +28,9 @@ class SlurmPipeline(object):
     @param specification: Either a C{str} giving the name of a file containing
         a JSON execution specification, or a C{dict} holding a correctly
         formatted execution specification.
+    @param force: If C{True}, step scripts will be told (via the environment
+        variable SP_FORCE=1) that they may overwrite pre-existing result files.
+        I.e., that --force was used on the slurm-pipeline.py command line.
     @param scriptArgs: A C{list} of C{str} arguments that should be put on the
         command line of all steps that have no dependencies.
     """
@@ -38,7 +41,7 @@ class SlurmPipeline(object):
     # job ids. The following regex just matches the first part of that.
     TASK_NAME_LINE = re.compile('^TASK:\s+(\S+)\s*')
 
-    def __init__(self, specification, scriptArgs=None):
+    def __init__(self, specification, force=False, scriptArgs=None):
         if isinstance(specification, string_types):
             specification = self._loadSpecification(specification)
         # self.steps will be keyed by step name, with values that are
@@ -51,6 +54,7 @@ class SlurmPipeline(object):
         self._scriptArgs = scriptArgs
         self._scriptArgsStr = (
             ' '.join(map(str, scriptArgs)) if scriptArgs else '')
+        environ['SP_FORCE'] = str(int(force))
 
     def schedule(self):
         """
@@ -89,26 +93,30 @@ class SlurmPipeline(object):
                 # have all finished. We will only run the script once, and tell
                 # it about all job ids for all tasks that are depended on.
                 env = environ.copy()
-                env.update({
-                    'SP_ORIGINAL_ARGS': self._scriptArgsStr,
-                    'SP_DEPENDENCY_ARG': '--dependency=' + ','.join(
-                        sorted(('afterok:%d' % jobId)
-                               for jobIds in taskDependencies.values()
-                               for jobId in jobIds)),
-                })
+                env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
+                dependencies = ','.join(
+                    sorted(('afterok:%d' % jobId)
+                           for jobIds in taskDependencies.values()
+                           for jobId in jobIds))
+                if dependencies:
+                    env['SP_DEPENDENCY_ARG'] = '--dependency=' + dependencies
+                else:
+                    env.pop('SP_DEPENDENCY_ARG', None)
                 self._runStepScript(step, sorted(taskDependencies), env)
             else:
                 # The script for this step gets run once for each task in the
                 # steps it depends on.
                 for taskName in sorted(taskDependencies):
-                    jobIds = self.steps[stepName]['tasks'][taskName]
                     env = environ.copy()
-                    env.update({
-                        'SP_ORIGINAL_ARGS': self._scriptArgsStr,
-                        'SP_DEPENDENCY_ARG': '--dependency=' + (
-                            ','.join(sorted(('afterok:%d' % jobId)
-                                            for jobId in jobIds))),
-                    })
+                    env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
+                    jobIds = self.steps[stepName]['tasks'][taskName]
+                    dependencies = ','.join(sorted(('afterok:%d' % jobId)
+                                                   for jobId in jobIds))
+                    if dependencies:
+                        env['SP_DEPENDENCY_ARG'] = ('--dependency=' +
+                                                    dependencies)
+                    else:
+                        env.pop('SP_DEPENDENCY_ARG', None)
                     self._runStepScript(step, [taskName], env)
         else:
             # Either this step has no dependencies or the steps it is

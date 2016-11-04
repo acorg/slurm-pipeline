@@ -7,3 +7,4 @@ examples/blast/x??
 examples/blast/x??.blast-out
 examples/blast/BEST-HITS
 examples/blast/pipeline.log
+*.pyc

@@ -131,6 +131,10 @@ Two environment variables are set when a step's script is exectued:
   originally passed to `slurm-pipeline.py`. Most scripts will not need to
   know this information, but it might be useful. Scripts with no
   dependencies get these arguments on the command line too.
+* `SP_FORCE` will be set to `1` if `--force` is given on the
+  `slurm-pipeline.py` command line. This can be used to inform step scripts
+  that they may overwrite pre-existing result files if they wish. If
+  `--force` is not specified, `SP_FORCE` will be set to `0`.
 * `SP_DEPENDENCY_ARG` contains a string that must be used when the script
   invokes `sbatch` to guarantee that the execution of the script does not
   begin until after the tasks from all dependent steps have finished
@@ -147,7 +151,7 @@ echo "TASK: $task $jobid"
 This calls `sbatch` with the dependency argument (if any) and
 simultaneously gets the job id from the `sbatch` output (`sbatch` prints a
 line like `Submitted batch job 3779695`) and the `cut` in the above pulls
-out just the job id. The task name is then emitted, along wtih the job id.
+out just the job id. The task name is then emitted, along with the job id.
 
 A task name may be emitted multiple times by the same script.
 
@@ -171,10 +175,10 @@ names. That will make it simple for later scripts to find the files from
 earlier processing and to make file names to hold their own output.
 
 You can confirm that `slurm-pipeline.py` doesn't even require that SLURM is
-installed on a machine by running the examples in the `examples`
-directory. The scripts in the examples all do their work synchronously
-(they emit fake SLURM job ids using the Bash shell's `RANDOM` variable,
-just to make it look like they are submitting jobs to `sbatch`).
+installed on a machine by running the examples in the `examples` directory.
+The scripts in the examples all do their work synchronously (they emit fake
+SLURM job ids using the Bash shell's `RANDOM` variable, just to make it
+look like they are submitting jobs to `sbatch`).
 
 ### Examples
 

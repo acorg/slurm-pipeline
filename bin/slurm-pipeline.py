@@ -14,9 +14,14 @@ parser.add_argument(
     help=('The name of the file containing the pipeline specification, '
           'in JSON format'))
 
+parser.add_argument(
+    '--force', '-f', action='store_true', default=False,
+    help=('If specified, indicate to step scripts that they may overwrite '
+          'pre-existing results files.'))
+
 args, scriptArgs = parser.parse_known_args()
 
-sp = SlurmPipeline(args.specification, scriptArgs=scriptArgs)
+sp = SlurmPipeline(args.specification, args.force, scriptArgs=scriptArgs)
 sp.schedule()
 
 print(sp.toJSON())
