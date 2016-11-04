@@ -123,14 +123,54 @@ been scheduled, their SLURM job ids, script output, timestamps, etc. See
 the `word-count` example below for sample output (and the TODO section for
 plans for using the updated specification).
 
-#### Script environment variables
+### slurm-pipeline.py options
 
-Two environment variables are set when a step's script is exectued:
+`slurm-pipeline.py` accepts the following options:
+
+* `--specification filename`: as described above.
+* `--force`: Will cause `SP_FORCE` to be set in the environment of step
+  scripts with a value of `1`. It is up to the individual scripts to notice
+  this and act accordingly. If `--force` is not used, `SP_FORCE` will be
+  set to `0`.
+* `--firstStep step-name`: Step scripts are always run with an environment
+  variable called `SP_SIMULATE`. Normally this will be set to `0` for all
+  steps. Sometimes though, you may want to start a pipeline from one of its
+  intermediate steps and not re-do the work of earlier steps. Using
+  `--firstStep step-name` Will cause `step-name` to be run with
+  `SP_SIMULATE=0` in its environment. Earlier steps in the pipeline will be
+  run with `SP_SIMULATE=1`. It is up to the scripts to decide how to act
+  when `SP_SIMULATE=1`.
+* `--lastStep step-name`: Corresponds to `--firstStep`, except it turns
+  simulation back on (i.e., sets `SP_SIMULATE=1`) after the named step.
+  Note that `--firstStep` and `--lastStep` may specify the same step (to
+  just run that step) and that `--firstStep` may be given without also
+  giving `--lastStep`.
+
+Note that all script steps are *always* executed, including when
+`--firstStep` is used. It is up to the scripts to decide what to do.
+Scripts that are simulating will normally want to emit task names, as
+usual, but without doing any work. In that case they can emit the task name
+with no job id, so the later steps in the pipeline will not need to wait.
+
+It is cleaner to implement partial pipeline operation like this because it
+would otherwise be unclear how to invoke intermediate step scripts if the
+earlier scripts had not emitted any task names.  Simulated steps may still
+want to log the fact that they were run in simulated mode, etc. And it's
+conceptually easier to know that `slurm-pipeline.py` always runs all
+pipeline step scripts (see the Separation of concerns section below).
+
+### Step script environment variables
+
+The following environment variables are set when a step's script is
+exectued:
 
 * `SP_ORIGINAL_ARGS` contains the (space-separated) list of arguments
   originally passed to `slurm-pipeline.py`. Most scripts will not need to
-  know this information, but it might be useful. Scripts with no
-  dependencies get these arguments on the command line too.
+  know this information, but it might be useful. Scripts that have no
+  dependencies will be run with these arguments on the command line too.
+  Note that if an original command-line argument contained a space, and you
+  split `SP_ORIGINAL_ARGS` on spaces, you'll have two strings instead of
+  one.
 * `SP_FORCE` will be set to `1` if `--force` is given on the
   `slurm-pipeline.py` command line. This can be used to inform step scripts
   that they may overwrite pre-existing result files if they wish. If
@@ -139,6 +179,15 @@ Two environment variables are set when a step's script is exectued:
   invokes `sbatch` to guarantee that the execution of the script does not
   begin until after the tasks from all dependent steps have finished
   successfully.
+* `SP_SIMULATE` will be set to `1` if the step should be simulated, and `0`
+  if not. In simulating a step, a script should just emit its task name(s)
+  as usual, but without job ids. The presumption is that a pipeline is
+  being re-run and that the work that would normally be done by a step that
+  is now being simulated has already been done. A script that is called
+  with `SP_SIMULATE=1` might want to check that its regular output does in
+  fact already exist, but there's no need to exit if not. The entire
+  pipeline might be simulated, in which case there is no issue if
+  intermediate results are never computed.
 
 The canonical way to use `SP_DEPENDENCY_ARG` in a step script is as
 follows:
@@ -334,6 +383,29 @@ are removed along the way (uncomment the clean up `rm` line in
 `2-run-blast.sh` and `3-collect.sh` and re-run to see the 200 intermediate
 files).
 
+#### Simulated BLAST with --force and --firstStep
+
+`examples/blast-with-force-and-simulate` simulates the running of
+[BLAST](https://blast.ncbi.nlm.nih.gov/Blast.cgi) on a FASTA file, as
+above.
+
+In this case the step scripts take the values of `SP_FORCE` and
+`SP_SIMULATE` into account.
+
+As in the `examples/blast` example, all the action takes place in the same
+directory, but intermediate files are not removed along the way. This
+allows the step scripts to avoid doing work when `SP_SIMULATE=1` and to
+detect whether their output already exists, etc. A detailed log of the
+actions taken is written to `pipeline.log`.
+
+The `Makefile` has some convenient targets: `run`, `rerun`, and `force`.
+You can (and should) of course run `slurm-pipeline.py` from the command
+line yourself, with and without `--force` and using `--firstStep` and
+`--lastStep` to control which steps are simulated (i.e., receive
+`SP_SIMULATE=1` in their environment) and which are not.
+
+ Use `make clean` to get rid of the intermediate files.
+
 #### A more realistic example
 
 Another example can be seen in another of my repos,
@@ -347,14 +419,9 @@ the `examples` directory.
 
 * Make `slurm-pipeline.py` able to accept an in-progress specification
   so it can report on output, tasks, job ids, completion, timing, etc.
-* Add `--first-step` and `--last-step` (or similar) options to
-  `slurm-pipeline.py` to have it only execute a subset of the steps in a
-  specification. This will require an in-progress specification because
-  earlier processing may still be in process, and so dependency information
-  is needed. The job ids of dependent tasks are in the specification.
-* Make it possible to pass the names of the two environment variables
-  (currently hard-coded as `SP_ORIGINAL_ARGS` and `SP_DEPENDENCY_ARG`) to
-  the `SlurmPipeline` constructor.
+* Make it possible to pass the names (or at least the prefix) of the two
+  environment variables (currently hard-coded as `SP_ORIGINAL_ARGS` and
+  `SP_DEPENDENCY_ARG`) to the `SlurmPipeline` constructor.
 * Make it possible to pass a regex for matching task name and job id lines
   in a script's stdout to the `SlurmPipeline` constructor (instead of
   using the currently hard-coded `TASK: name jobid1 jobid2`).
