@@ -175,34 +175,35 @@ exectued:
   `slurm-pipeline.py` command line. This can be used to inform step scripts
   that they may overwrite pre-existing result files if they wish. If
   `--force` is not specified, `SP_FORCE` will be set to `0`.
+* `SP_SIMULATE` will be set to `1` if the step should be simulated, and `0`
+  if not. See the description of `--firstStep` and `--lastStep` above for
+  how to turn simulation on and off. In simulating a step, a script should
+  just emit its task name(s) as usual, but without job ids. The presumption
+  is that a pipeline is being re-run and that the work that would normally
+  be done by a step that is now being simulated has already been done. A
+  script that is called with `SP_SIMULATE=1` might want to check that its
+  regular output does in fact already exist, but there's no need to exit if
+  not. The entire pipeline might be simulated, in which case there is no
+  issue if intermediate results are never computed.
 * `SP_DEPENDENCY_ARG` contains a string that must be used when the script
   invokes `sbatch` to guarantee that the execution of the script does not
   begin until after the tasks from all dependent steps have finished
   successfully.
-* `SP_SIMULATE` will be set to `1` if the step should be simulated, and `0`
-  if not. In simulating a step, a script should just emit its task name(s)
-  as usual, but without job ids. The presumption is that a pipeline is
-  being re-run and that the work that would normally be done by a step that
-  is now being simulated has already been done. A script that is called
-  with `SP_SIMULATE=1` might want to check that its regular output does in
-  fact already exist, but there's no need to exit if not. The entire
-  pipeline might be simulated, in which case there is no issue if
-  intermediate results are never computed.
 
-The canonical way to use `SP_DEPENDENCY_ARG` in a step script is as
-follows:
+    The canonical way to use `SP_DEPENDENCY_ARG` in a step script is as
+    follows:
 
-```sh
-jobid=`sbatch -n 1 $SP_DEPENDENCY_ARG submit.sh $task | cut -f4 -d' '`
-echo "TASK: $task $jobid"
-```
+    ```sh
+    jobid=`sbatch -n 1 $SP_DEPENDENCY_ARG submit.sh $task | cut -f4 -d' '`
+    echo "TASK: $task $jobid"
+    ```
 
-This calls `sbatch` with the dependency argument (if any) and
-simultaneously gets the job id from the `sbatch` output (`sbatch` prints a
-line like `Submitted batch job 3779695`) and the `cut` in the above pulls
-out just the job id. The task name is then emitted, along with the job id.
+    This calls `sbatch` with the dependency argument (if any) and
+    simultaneously gets the job id from the `sbatch` output (`sbatch` prints a
+    line like `Submitted batch job 3779695`) and the `cut` in the above pulls
+    out just the job id. The task name is then emitted, along with the job id.
 
-A task name may be emitted multiple times by the same script.
+    A task name may be emitted multiple times by the same script.
 
 ### Separation of concerns
 
