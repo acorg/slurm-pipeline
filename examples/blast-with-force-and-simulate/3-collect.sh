@@ -27,7 +27,6 @@ then
         else
             echo "Will not overwrite pre-existing result file ($out). Use --force to make me." >> pipeline.log
             echo "`basename $0`: Will not overwrite pre-existing result file ($out). Use --force to make me." >&2
-            exit 1
         fi
     else
         echo "No pre-existing result file ($out) exists, making it." >> pipeline.log

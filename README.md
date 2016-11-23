@@ -82,7 +82,7 @@ script (or scripts). If a step depends on multiple earlier steps that each
 emit the same task name, the script will only be called once with that task
 name but after all the tasks from all the dependent steps have finished.
 
-So, for example, a step that starts the processessing of 10 FASTA files
+So, for example, a step that starts the processing of 10 FASTA files
 could emit the file names, to trigger ten downstream invocations of a
 dependent step's script.
 

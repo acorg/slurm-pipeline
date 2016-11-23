@@ -20,7 +20,6 @@ then
         else
             echo "Will not overwrite pre-existing split files. Use --force to make me." >> pipeline.log
             echo "`basename $0`: Will not overwrite pre-existing split files. Use --force to make me." >&2
-            exit 1
         fi
     else
         echo "No pre-existing split files exist, splitting." >> pipeline.log

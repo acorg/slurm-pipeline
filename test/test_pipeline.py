@@ -4,9 +4,10 @@ from six.moves import builtins
 from six import assertRaisesRegex, PY3
 from json import dumps
 import subprocess
+import platform
 
 from slurm_pipeline.pipeline import (
-    SlurmPipeline, SpecificationError, SchedulingError)
+    SlurmPipeline, SpecificationError, SchedulingError, DEVNULL)
 
 try:
     from unittest.mock import ANY, call, patch
@@ -14,6 +15,8 @@ except ImportError:
     from mock import ANY, call, patch
 
 from .mocking import mockOpen
+
+PYPY = platform.python_implementation() == 'PyPy'
 
 
 class TestRunner(TestCase):
@@ -30,6 +33,10 @@ class TestRunner(TestCase):
         with patch.object(builtins, 'open', mockOpener):
             if PY3:
                 error = '^Expecting value: line 1 column 1 \(char 0\)$'
+            elif PYPY:
+                # The error message in the exception has a NUL in it.
+                error = ("^No JSON object could be decoded: unexpected "
+                         "'\\000' at char 0$")
             else:
                 error = '^No JSON object could be decoded$'
             assertRaisesRegex(self, ValueError, error, SlurmPipeline, 'file')
@@ -45,6 +52,10 @@ class TestRunner(TestCase):
             if PY3:
                 error = ('^Expecting property name enclosed in double '
                          'quotes: line 1 column 2 \(char 1\)$')
+            elif PYPY:
+                # The error message in the exception has a NUL in it.
+                error = ("^No JSON object could be decoded: unexpected "
+                         "'\\000' at char 0$")
             else:
                 error = '^Expecting object: line 1 column 1 \(char 0\)$'
             assertRaisesRegex(self, ValueError, error, SlurmPipeline, 'file')
@@ -643,14 +654,14 @@ class TestRunner(TestCase):
 
             mockMethod.assert_has_calls([
                 call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 # /bin/script2 is run twice because it depends on
                 # 'name1', which starts two jobs (and name2 is not a
                 # collector step).
                 call(['/bin/script2', 'aaa'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['/bin/script2', 'bbb'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
             ])
 
             # Check that the dependency environment variable is correct in
@@ -733,14 +744,14 @@ class TestRunner(TestCase):
 
             mockMethod.assert_has_calls([
                 call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 # /bin/script2 is run twice because it depends on
                 # 'name1', which starts two jobs (and name2 is not a
                 # collector step).
                 call(['/bin/script2', 'aaa'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['/bin/script2', 'bbb'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
             ])
 
             # Check that the dependency environment variable is not set in
@@ -836,11 +847,11 @@ class TestRunner(TestCase):
             # expected arguments.
             mockMethod.assert_has_calls([
                 call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script2'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script3', 'aaa', 'bbb', 'xxx', 'yyy'], cwd='.',
-                     stdin=subprocess.DEVNULL, universal_newlines=True,
+                     stdin=DEVNULL, universal_newlines=True,
                      env=ANY),
             ])
 
@@ -888,7 +899,7 @@ class TestRunner(TestCase):
 
             mockMethod.assert_has_calls([
                 call(['/fictional/path'], cwd='/tmp', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
             ])
 
     @patch('os.access')
@@ -939,13 +950,13 @@ class TestRunner(TestCase):
 
             mockMethod.assert_has_calls([
                 call(['script1', 'hey', '3'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script2', 'hey', '3'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script3', 'aaa'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script3', 'bbb'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
             ])
 
             # Check that the environment variables we set were correct
@@ -995,7 +1006,7 @@ class TestRunner(TestCase):
 
             mockMethod.assert_has_calls([
                 call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
             ])
 
             env = mockMethod.mock_calls[0][2]['env']
@@ -1027,9 +1038,9 @@ class TestRunner(TestCase):
 
             mockMethod.assert_has_calls([
                 call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script2'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
             ])
 
             # Check that the SP_SIMULATE environment variable is correct in
@@ -1075,13 +1086,13 @@ class TestRunner(TestCase):
 
             mockMethod.assert_has_calls([
                 call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script2'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script3'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script4'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
             ])
 
             # Check that the SP_SIMULATE environment variable is correct in
@@ -1129,11 +1140,11 @@ class TestRunner(TestCase):
 
             mockMethod.assert_has_calls([
                 call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script2'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
                 call(['script3'], cwd='.', universal_newlines=True,
-                     stdin=subprocess.DEVNULL, env=ANY),
+                     stdin=DEVNULL, env=ANY),
             ])
 
             # Check that the SP_SIMULATE environment variable is correct in
