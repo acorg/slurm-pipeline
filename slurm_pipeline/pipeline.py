@@ -50,7 +50,6 @@ class SlurmPipeline(object):
           system to settle, so that jobs that have been scheduled can be seen
           when used as dependencies in later invocations of sbatch. Pass 0.0
           for no sleep.
-
     @param scriptArgs: A C{list} of C{str} arguments that should be put on the
         command line of all steps that have no dependencies.
     """
