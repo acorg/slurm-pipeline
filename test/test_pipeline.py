@@ -1188,3 +1188,67 @@ class TestRunner(TestCase):
         runner.schedule()
 
         sleepMock.assert_has_calls([call(1.0), call(1.0)])
+
+    @patch('subprocess.check_output')
+    @patch('time.sleep')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testSleepNotCalledByDefault(self, existsMock, accessMock, sleepMock,
+                                    subprocessMock):
+        """
+        If no sleep argument is given to SlurmPipeline, sleep must not be
+        called.
+        """
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'dependencies': ['name1'],
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            })
+        runner.schedule()
+
+        self.assertFalse(sleepMock.called)
+
+    @patch('subprocess.check_output')
+    @patch('time.sleep')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testSleepNotCalledWhenZero(self, existsMock, accessMock, sleepMock,
+                                   subprocessMock):
+        """
+        If a sleep argument of 0.0 is given to SlurmPipeline, sleep must not be
+        called.
+        """
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'dependencies': ['name1'],
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            }, sleep=0.0)
+        runner.schedule()
+
+        self.assertFalse(sleepMock.called)
