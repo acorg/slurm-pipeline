@@ -34,7 +34,7 @@ parser.add_argument(
           'in which step scripts are executed.'))
 
 parser.add_argument(
-    '--sleep', type=float, default=5.0,
+    '--sleep', type=float, default=0.0,
     help=('Specify the (floating point) number of seconds to sleep for '
           'between running step scripts. This can be used to allow a '
           'distributed file system to settle, so that jobs that have been '
