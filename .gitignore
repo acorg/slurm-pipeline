@@ -14,3 +14,4 @@ examples/blast-with-force-and-simulate/x??.blast-out
 examples/blast-with-force-and-simulate/BEST-HITS
 examples/blast-with-force-and-simulate/pipeline.log
 examples/blast-with-force-and-simulate/specification-post-run.json
+.tox

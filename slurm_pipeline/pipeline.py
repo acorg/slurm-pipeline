@@ -7,6 +7,11 @@ from json import load, dumps
 import subprocess
 from collections import defaultdict
 
+try:
+    from subprocess import DEVNULL  # py3k
+except ImportError:
+    DEVNULL = open(os.devnull, 'r+b')
+
 
 class SlurmPipelineError(Exception):
     'Base class of all SlurmPipeline exceptions'
@@ -206,7 +211,7 @@ class SlurmPipeline(object):
                 script = path.abspath(script)
 
         step['stdout'] = subprocess.check_output(
-            [script] + args, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+            [script] + args, cwd=cwd, env=env, stdin=DEVNULL,
             universal_newlines=True)
 
         # Look at all output lines for task names and SLURM job ids created
