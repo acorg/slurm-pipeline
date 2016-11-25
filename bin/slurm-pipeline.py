@@ -33,11 +33,19 @@ parser.add_argument(
           'help text for --first-step for how this affects the environment '
           'in which step scripts are executed.'))
 
+parser.add_argument(
+    '--sleep', type=float, default=5.0,
+    help=('Specify the (floating point) number of seconds to sleep for '
+          'between running step scripts. This can be used to allow a '
+          'distributed file system to settle, so that jobs that have been '
+          'scheduled can be seen when used as dependencies in later '
+          'invocations of sbatch.'))
+
 args, scriptArgs = parser.parse_known_args()
 
 sp = SlurmPipeline(args.specification, force=args.force,
                    firstStep=args.firstStep, lastStep=args.lastStep,
-                   scriptArgs=scriptArgs)
+                   sleep=args.sleep, scriptArgs=scriptArgs)
 sp.schedule()
 
 print(sp.toJSON())

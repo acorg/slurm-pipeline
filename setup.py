@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='slurm-pipeline',
-      version='1.0.8',
+      version='1.0.9',
       packages=['slurm_pipeline'],
       include_package_data=True,
       url='https://github.com/acorg/slurm-pipeline',

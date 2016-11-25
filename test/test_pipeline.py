@@ -421,14 +421,14 @@ class TestRunner(TestCase):
         with patch.object(subprocess, 'check_output',
                           return_value='Submitted batch job 4\n'):
             runner = SlurmPipeline(
-                    {
-                        'steps': [
-                            {
-                                'name': 'name1',
-                                'script': 'script1',
-                            },
-                        ],
-                    })
+                {
+                    'steps': [
+                        {
+                            'name': 'name1',
+                            'script': 'script1',
+                        },
+                    ],
+                })
             runner.schedule()
             error = '^Specification has already been scheduled$'
             assertRaisesRegex(self, SchedulingError, error,
@@ -1157,3 +1157,34 @@ class TestRunner(TestCase):
 
             env3 = mockMethod.mock_calls[2][2]['env']
             self.assertEqual('1', env3['SP_SIMULATE'])
+
+    @patch('subprocess.check_output')
+    @patch('time.sleep')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testSleep(self, existsMock, accessMock, sleepMock, subprocessMock):
+        """
+        If a sleep argument is given to SlurmPipeline, sleep must be called
+        between steps with the expected number of seconds.
+        """
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'dependencies': ['name1'],
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            }, sleep=1.0)
+        runner.schedule()
+
+        sleepMock.assert_has_calls([call(1.0), call(1.0)])
