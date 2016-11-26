@@ -1,4 +1,4 @@
-.PHONY: run clean
+.PHONY: run, clean
 
 run:
 	../../bin/slurm-pipeline.py -s specification.json viruses.fasta > specification-post-run.json

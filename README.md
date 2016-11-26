@@ -3,8 +3,6 @@
 A Python class for scheduling [SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
-## Operation
-
 This repo contains a Python script, `bin/slurm-pipeline.py` that can
 schedule programs to be run in an organized pipeline fashion on a Linux
 cluster that uses SLURM as a workload manager. Here "pipeline" means with
@@ -39,7 +37,7 @@ repo. Here's an example,  `examples/word-count/specification.json`:
 The specification above contains almost everything you need to know to set
 up your own pipeline, though you of course still have to write the scripts.
 
-### Steps
+## Steps
 
 A pipeline run is organized into a series of conceptual *steps*. These are
 scheduled in the order they appear in the specification file. The actual
@@ -65,7 +63,7 @@ directory that the script should be invoked from. If no directory is given,
 the script will be run in the directory where you invoke
 `slurm-pipeline.py`.
 
-### Tasks
+## Tasks
 
 A step may choose to emit one or more *task*s. It does this by writing
 lines such as `TASK: xxx 39749 39750` to its standard output (this may
@@ -123,7 +121,7 @@ been scheduled, their SLURM job ids, script output, timestamps, etc. See
 the `word-count` example below for sample output (and the TODO section for
 plans for using the updated specification).
 
-### slurm-pipeline.py options
+## slurm-pipeline.py options
 
 `slurm-pipeline.py` accepts the following options:
 
@@ -145,21 +143,66 @@ plans for using the updated specification).
   Note that `--firstStep` and `--lastStep` may specify the same step (to
   just run that step) and that `--firstStep` may be given without also
   giving `--lastStep`.
+* `--skip`: Used to tell `slurm-pipeline.py` to tell a step script that it
+  should be skipped. In this case the script should act as though it is not
+  even in the pipeline. Commonly this will mean just taking its expected
+  input file and copying it unchanged to the place where it normally puts
+  its output. This allows the next script in the pipeline to run without
+  error. This argument may be repeated to skip multiple steps. See also the
+  `skip` directive that can be used in a specification file for more
+  permanent disabling of a script step.
 
 Note that all script steps are *always* executed, including when
-`--firstStep` is used. It is up to the scripts to decide what to do.
-Scripts that are simulating will normally want to emit task names, as
-usual, but without doing any work. In that case they can emit the task name
-with no job id, so the later steps in the pipeline will not need to wait.
+`--firstStep` or `--skip` are used. It is up to the scripts to decide what
+to do.
 
-It is cleaner to implement partial pipeline operation like this because it
+### Simulating versus skipping
+
+Scripts that are simulating will normally want to emit task names, as
+usual, but without doing any work *because the work has already been done
+in a previous run*. In that case they can emit the task name with no job
+id, so the later steps in the pipeline will not need to wait.  In
+simulation (as opposed to skipping), the script has already done its work
+(its output file(s) are already in place) and simply does nothing.
+
+Skipping refers to when a step is really no longer in the pipeline. A step
+that skips will normally just want to pass along its input to its output
+unchanged. The step still needs to be run so that it can make sure that its
+subsequent step(s) do not fail. It can be more convenient to add `"skip":
+true` to a specification file to completely get rid of a step rather than
+changing the subsequent step to take its input from the location the
+stepped script would use. Being able to use `--skip step-name` on the
+command line provides an easy way to skip a step.
+
+In summary, a simulated step doesn't do anything because its work was
+already done on a previous run, but a skipped step pretends it's not there
+at all (normally by copying its input to its output unchanged). The skipped
+step *never* does anything, the simulated step has *already* done its work.
+
+### Why are all scripts always executed?
+
+It is cleaner to implement partial pipeline operation as above because it
 would otherwise be unclear how to invoke intermediate step scripts if the
 earlier scripts had not emitted any task names.  Simulated steps may still
 want to log the fact that they were run in simulated mode, etc. And it's
 conceptually easier to know that `slurm-pipeline.py` always runs all
 pipeline step scripts (see the Separation of concerns section below).
 
-### Step script environment variables
+## Specification file directives
+
+You've already seen most of the specification file directives above. Here's
+the full list:
+
+* `name`: the name of the step (required).
+* `script`: the script to run (required).
+* `cwd`: the directory to run the script in.
+* `collect`: for scripts that should run only when all tasks from all their
+  prerequisites have completed.
+* `dependencies`: a list of previous steps that a step depends on.
+* `skip`: if `true`, the step script will be run with `SP_SKIP=1` in its
+  environment. Otherwise, `SP_SKIP` will always be set and will be `0`.
+
+## Step script environment variables
 
 The following environment variables are set when a step's script is
 exectued:
@@ -205,7 +248,7 @@ exectued:
 
     A task name may be emitted multiple times by the same script.
 
-### Separation of concerns
+## Separation of concerns
 
 `slurm-pipeline.py` doesn't interact with SLURM at all. Actually, the
 *only* thing it knows about SLURM is how to construct a dependency argument
@@ -230,11 +273,11 @@ The scripts in the examples all do their work synchronously (they emit fake
 SLURM job ids using the Bash shell's `RANDOM` variable, just to make it
 look like they are submitting jobs to `sbatch`).
 
-### Examples
+## Examples
 
 There are some simple examples in the `examples` directory:
 
-#### Word counting
+### Word counting
 
 `examples/word-count` (whose `specification.json` file is shown above) ties
 together three scripts to find the most commonly used long words in three
@@ -367,7 +410,16 @@ tasks the step depends on.  Note that the job ids will differ on your
 machine due to the use of the `$RANDOM` variable to make fake job id
 numbers in the pipeline scripts.
 
-#### Simulated BLAST
+### Word counting, skipping the long words step
+
+The `examples/word-count-with-skipping` example is exactly the same as
+`examples/word-count` but provides for the possibility of skipping the step
+that filters out short words. If you execute `make run` in that directory,
+you'll see `slurm-pipeline.py` called with `--skip long-words`. The
+resulting `output/MOST-FREQUENT-WORDS` output file contains typical
+freqeunt (short) English words such as `the`, `and`, etc.
+
+### Simulated BLAST
 
 `examples/blast` simulates the running of
 [BLAST](https://blast.ncbi.nlm.nih.gov/Blast.cgi) on a FASTA file. This is
@@ -384,7 +436,7 @@ are removed along the way (uncomment the clean up `rm` line in
 `2-run-blast.sh` and `3-collect.sh` and re-run to see the 200 intermediate
 files).
 
-#### Simulated BLAST with --force and --firstStep
+### Simulated BLAST with --force and --firstStep
 
 `examples/blast-with-force-and-simulate` simulates the running of
 [BLAST](https://blast.ncbi.nlm.nih.gov/Blast.cgi) on a FASTA file, as
@@ -407,7 +459,7 @@ line yourself, with and without `--force` and using `--firstStep` and
 
  Use `make clean` to get rid of the intermediate files.
 
-#### A more realistic example
+### A more realistic example
 
 Another example can be seen in another of my repos,
 [eske-pipeline-spec](https://github.com/acorg/eske-pipeline-spec). You wont
