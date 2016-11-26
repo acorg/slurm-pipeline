@@ -1,7 +1,7 @@
 import os
 from os import path, environ
 import re
-from time import time
+import time
 from six import string_types
 from json import load, dumps
 import subprocess
@@ -45,6 +45,11 @@ class SlurmPipeline(object):
     @param lastStep: If not C{None}, the name of the last specification step
           to execute. See above docs for C{firstStep} for how this affects the
           calling of step scripts.
+    @param sleep: Gives the C{float} number of seconds to sleep for between
+          running step scripts. This can be used to allow a distributed file
+          system to settle, so that jobs that have been scheduled can be seen
+          when used as dependencies in later invocations of sbatch. Pass 0.0
+          for no sleep.
     @param scriptArgs: A C{list} of C{str} arguments that should be put on the
         command line of all steps that have no dependencies.
     """
@@ -56,7 +61,7 @@ class SlurmPipeline(object):
     TASK_NAME_LINE = re.compile('^TASK:\s+(\S+)\s*')
 
     def __init__(self, specification, force=False, firstStep=None,
-                 lastStep=None, scriptArgs=None):
+                 lastStep=None, sleep=0.0, scriptArgs=None):
         if isinstance(specification, string_types):
             specification = self._loadSpecification(specification)
         # self.steps will be keyed by step name, with values that are
@@ -68,6 +73,7 @@ class SlurmPipeline(object):
         self.lastStep = lastStep
         self._checkSpecification(specification)
         self.specification = specification
+        self._sleep = sleep
         self._scriptArgs = scriptArgs
         self._scriptArgsStr = (
             ' '.join(map(str, scriptArgs)) if scriptArgs else '')
@@ -83,11 +89,12 @@ class SlurmPipeline(object):
         if 'scheduledAt' in self.specification:
             raise SchedulingError('Specification has already been scheduled')
         else:
-            self.specification['scheduledAt'] = time()
+            self.specification['scheduledAt'] = time.time()
 
             firstStepFound = lastStepFound = False
+            nSteps = len(self.specification['steps'])
 
-            for step in self.specification['steps']:
+            for stepIndex, step in enumerate(self.specification['steps']):
                 if self.firstStep is not None:
                     if firstStepFound:
                         if self.lastStep is not None:
@@ -111,6 +118,11 @@ class SlurmPipeline(object):
                     simulate = False
 
                 self._scheduleStep(step, simulate)
+
+                # If we're supposed to pause between scheduling steps and
+                # this is not the last step, then sleep.
+                if self._sleep > 0.0 and stepIndex < nSteps - 1:
+                    time.sleep(self._sleep)
 
     def _scheduleStep(self, step, simulate):
         """
@@ -184,7 +196,7 @@ class SlurmPipeline(object):
             env.pop('SP_DEPENDENCY_ARG', None)
             self._runStepScript(step, args, env)
 
-        step['scheduledAt'] = time()
+        step['scheduledAt'] = time.time()
 
     def _runStepScript(self, step, args, env):
         """
