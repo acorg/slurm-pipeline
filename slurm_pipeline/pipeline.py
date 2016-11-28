@@ -5,7 +5,7 @@ import time
 from six import string_types
 from json import load, dumps
 import subprocess
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 try:
     from subprocess import DEVNULL  # py3k
@@ -34,24 +34,6 @@ class SlurmPipeline(object):
         a JSON execution specification, or a C{dict} holding a correctly
         formatted execution specification. Note that in the latter case the
         passed specification C{dict} will be modified by this script.
-    @param force: If C{True}, step scripts will be told (via the environment
-        variable SP_FORCE=1) that they may overwrite pre-existing result files.
-        I.e., that --force was used on the slurm-pipeline.py command line.
-    @param firstStep: If not C{None}, the name of the first specification step
-        to execute. Earlier steps will actually be executed but they will
-        have SP_SIMULATE=1 in their environment, allowing them to not do
-        actual work (while still emitting task names without job numbers so
-        that later steps receive the correct tasks to operate on.
-    @param lastStep: If not C{None}, the name of the last specification step
-        to execute. See above docs for C{firstStep} for how this affects the
-        calling of step scripts.
-    @param sleep: Gives the C{float} number of seconds to sleep for between
-        running step scripts. This can be used to allow a distributed file
-        system to settle, so that jobs that have been scheduled can be seen
-        when used as dependencies in later invocations of sbatch. Pass 0.0
-        for no sleep.
-    @param scriptArgs: A C{list} of C{str} arguments that should be put on the
-        command line of all steps that have no dependencies.
     """
 
     # In script output, look for lines of the form
@@ -60,90 +42,103 @@ class SlurmPipeline(object):
     # job ids. The following regex just matches the first part of that.
     TASK_NAME_LINE = re.compile('^TASK:\s+(\S+)\s*')
 
-    def __init__(self, specification, force=False, firstStep=None,
-                 lastStep=None, sleep=0.0, scriptArgs=None):
+    def __init__(self, specification):
         if isinstance(specification, string_types):
             specification = self._loadSpecification(specification)
-        # self.steps will be keyed by step name, with values that are
-        # self.specification step dicts. This is for convenient / direct
-        # access to steps by name. It is initialized in
-        # self._checkSpecification.
-        self.steps = {}
-        self.firstStep = firstStep
-        self.lastStep = lastStep
         self._checkSpecification(specification)
         self.specification = specification
-        self._sleep = sleep
-        self._scriptArgs = scriptArgs
-        self._scriptArgsStr = (
-            ' '.join(map(str, scriptArgs)) if scriptArgs else '')
-        environ['SP_FORCE'] = str(int(force))
-        self.specification['force'] = force
-        self.specification['firstStep'] = firstStep
-        self.specification['lastStep'] = lastStep
 
-    def schedule(self, skip=None):
+    def schedule(self, force=False, firstStep=None, lastStep=None, sleep=0.0,
+                 scriptArgs=None, skip=None):
         """
         Schedule the running of our execution specification.
 
-        @param skip: A C{set} of step names that should be skipped. Those step
-            scripts will still be run, but will have C{SP_SKIP=1} in their
-            environment. Steps may also be skipped by using C{skip: "true"} in
-            the pipeline specification file.
-        @raise SchedulingError: If the specification has already been scheduled
-            or if asked to skip a non-existent step.
+        @param force: If C{True}, step scripts will be told (via the
+            environment variable SP_FORCE=1) that they may overwrite
+            pre-existing result files. I.e., that --force was used on the
+            slurm-pipeline.py command line.
+        @param firstStep: If not C{None}, the name of the first specification
+            step to execute. Earlier steps will actually be executed but they
+            will have SP_SIMULATE=1 in their environment, allowing them to not
+            do actual work (while still emitting task names without job
+            numbers so that later steps receive the correct tasks to operate
+            on.
+        @param lastStep: If not C{None}, the name of the last specification
+            step to execute. See above docs for C{firstStep} for how this
+            affects the calling of step scripts.
+        @param sleep: Gives the C{float} number of seconds to sleep for between
+            running step scripts. This can be used to allow a distributed file
+            system to settle, so that jobs that have been scheduled can be seen
+            when used as dependencies in later invocations of sbatch. Pass 0.0
+            for no sleep.
+        @param scriptArgs: A C{list} of C{str} arguments that should be put on
+            the command line of all steps that have no dependencies.
+        @param skip: A C{set} of C{str} step names that should be skipped.
+            Those step scripts will still be run, but will have C{SP_SKIP=1}
+            in their environment. Steps may also be skipped by using
+            C{skip: "true"} in the pipeline specification file.
+        @raise SchedulingError: If there is a problem with the first, last, or
+            skipped steps, as determined by self._checkRuntime.
+        @return: A specification C{dict}. This is a copy of the original
+            specification, updated with information about this scheduling.
         """
-        if 'scheduledAt' in self.specification:
-            raise SchedulingError('Specification has already been scheduled')
-        else:
-            self.specification['scheduledAt'] = time.time()
+        specification = self.specification.copy()
+        # steps is keyed by (ordered) specification step name, with values
+        # that are specification step dicts. This provides convenient
+        # direct access to steps by name.
+        steps = OrderedDict((s['name'], s) for s in specification['steps'])
+        nSteps = len(steps)
+        if nSteps and lastStep is not None and firstStep is None:
+            firstStep = specification['steps'][0]['name']
+        self._checkRuntime(steps, firstStep, lastStep, skip)
+        skip = skip or set()
+        specification.update({
+            'force': force,
+            'firstStep': firstStep,
+            'lastStep': lastStep,
+            'scheduledAt': time.time(),
+            'scriptArgs': scriptArgs,
+            'skip': skip,
+            'steps': steps,
+        })
 
-            if skip:
-                unknownSteps = skip - set(self.steps)
-                if unknownSteps:
-                    raise SchedulingError(
-                        'Unknown step%s (%s) passed to schedule' % (
-                            '' if len(unknownSteps) == 1 else 's',
-                            ', '.join(sorted(unknownSteps))))
-            else:
-                skip = set()
+        environ['SP_FORCE'] = str(int(force))
+        firstStepFound = lastStepFound = False
 
-            firstStepFound = lastStepFound = False
-            nSteps = len(self.specification['steps'])
-
-            for stepIndex, step in enumerate(self.specification['steps']):
-                if self.firstStep is not None:
-                    if firstStepFound:
-                        if self.lastStep is not None:
-                            if lastStepFound:
-                                simulate = True
-                            else:
-                                if step['name'] == self.lastStep:
-                                    simulate = False
-                                    lastStepFound = True
-                                else:
-                                    simulate = True
-                        else:
-                            simulate = False
-                    else:
-                        if step['name'] == self.firstStep:
-                            simulate = False
-                            firstStepFound = True
-                        else:
+        for stepIndex, stepName in enumerate(steps):
+            if firstStep is not None:
+                if firstStepFound:
+                    if lastStep is not None:
+                        if lastStepFound:
                             simulate = True
+                        else:
+                            if stepName == lastStep:
+                                simulate = False
+                                lastStepFound = True
+                            else:
+                                simulate = True
+                    else:
+                        simulate = False
                 else:
-                    simulate = False
+                    if stepName == firstStep:
+                        simulate = False
+                        firstStepFound = True
+                    else:
+                        simulate = True
+            else:
+                simulate = False
 
-                self._scheduleStep(
-                    step, simulate,
-                    step.get('skip') or step['name'] in skip)
+            self._scheduleStep(stepName, steps, simulate, scriptArgs,
+                               stepName in skip or ('skip' in steps[stepName]))
 
-                # If we're supposed to pause between scheduling steps and
-                # this is not the last step, then sleep.
-                if self._sleep > 0.0 and stepIndex < nSteps - 1:
-                    time.sleep(self._sleep)
+            # If we're supposed to pause between scheduling steps and this
+            # is not the last step, then sleep.
+            if sleep > 0.0 and stepIndex < nSteps - 1:
+                time.sleep(sleep)
 
-    def _scheduleStep(self, step, simulate, skip):
+        return specification
+
+    def _scheduleStep(self, stepName, steps, simulate, scriptArgs, skip):
         """
         Schedule a single execution step.
 
@@ -151,22 +146,26 @@ class SlurmPipeline(object):
         @param simulate: If C{True}, this step should be simulated. The step
             script is still run, but with SP_SIMULATE=1 in its environment.
             Else, SP_SIMULATE=0 will be in the environment.
+        @param scriptArgs: A C{list} of C{str} arguments that should be put on
+            the command line of all steps that have no dependencies.
         @param skip: If C{True}, the step should be skipped, which will be
             indicated to the script by SP_SKIP=1 in its environment. SP_SKIP
             will be 0 in non-skipped steps. It is up to the script, which is
             run in either case, to decide how to behave.
         """
-        assert 'scheduledAt' not in step
-        assert 'tasks' not in step
+        step = steps[stepName]
         step['tasks'] = defaultdict(set)
+        step['simulate'] = simulate
+        step['skip'] = skip
+        scriptArgsStr = ' '.join(map(str, scriptArgs)) if scriptArgs else ''
 
         # taskDependencies is keyed by task name. These are the tasks
         # started by the steps that the current step depends on.  Its
         # values are sets of SLURM job ids the tasks that step started and
         # which this step therefore depends on.
         step['taskDependencies'] = taskDependencies = defaultdict(set)
-        for stepName in step.get('dependencies', []):
-            for taskName, jobIds in self.steps[stepName]['tasks'].items():
+        for stepName in step.get('dependencies', ()):
+            for taskName, jobIds in steps[stepName]['tasks'].items():
                 taskDependencies[taskName].update(jobIds)
 
         if taskDependencies:
@@ -176,7 +175,7 @@ class SlurmPipeline(object):
                 # have all finished. We will only run the script once, and tell
                 # it about all job ids for all tasks that are depended on.
                 env = environ.copy()
-                env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
+                env['SP_ORIGINAL_ARGS'] = scriptArgsStr
                 env['SP_SIMULATE'] = str(int(simulate))
                 env['SP_SKIP'] = str(int(skip))
                 dependencies = ','.join(
@@ -193,10 +192,10 @@ class SlurmPipeline(object):
                 # steps it depends on.
                 for taskName in sorted(taskDependencies):
                     env = environ.copy()
-                    env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
+                    env['SP_ORIGINAL_ARGS'] = scriptArgsStr
                     env['SP_SIMULATE'] = str(int(simulate))
                     env['SP_SKIP'] = str(int(skip))
-                    jobIds = self.steps[stepName]['tasks'][taskName]
+                    jobIds = steps[stepName]['tasks'][taskName]
                     dependencies = ','.join(sorted(('afterok:%d' % jobId)
                                                    for jobId in jobIds))
                     if dependencies:
@@ -211,12 +210,12 @@ class SlurmPipeline(object):
             # dependencies, run the script with the originally passed
             # command line arguments. If there were dependencies but no
             # tasks have been started, run with no command line arguments.
-            if 'dependencies' in step or self._scriptArgs is None:
+            if 'dependencies' in step or scriptArgs is None:
                 args = []
             else:
-                args = list(map(str, self._scriptArgs))
+                args = list(map(str, scriptArgs))
             env = environ.copy()
-            env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
+            env['SP_ORIGINAL_ARGS'] = scriptArgsStr
             env['SP_SIMULATE'] = str(int(simulate))
             env['SP_SKIP'] = str(int(skip))
             env.pop('SP_DEPENDENCY_ARG', None)
@@ -290,6 +289,8 @@ class SlurmPipeline(object):
         @raise SpecificationError: if there is anything wrong with the
             specification.
         """
+        stepNames = set()
+
         if not isinstance(specification, dict):
             raise SpecificationError('The specification must be a dict (i.e., '
                                      'a JSON object when loaded from a file)')
@@ -300,8 +301,6 @@ class SlurmPipeline(object):
 
         if not isinstance(specification['steps'], list):
             raise SpecificationError('The "steps" key must be a list')
-
-        firstStepFound = lastStepFound = False
 
         for count, step in enumerate(specification['steps'], start=1):
             if not isinstance(step, dict):
@@ -333,22 +332,12 @@ class SlurmPipeline(object):
                 raise SpecificationError(
                     'The "name" key in step %d is not a string' % count)
 
-            if step['name'] in self.steps:
+            if step['name'] in stepNames:
                 raise SpecificationError(
                     'The name %r of step %d was already used in '
                     'an earlier step' % (step['name'], count))
 
-            self.steps[step['name']] = step
-
-            if step['name'] == self.firstStep:
-                firstStepFound = True
-
-            if step['name'] == self.lastStep:
-                if self.firstStep is not None and not firstStepFound:
-                    raise SpecificationError(
-                        'The lastStep %r occurs before the firstStep %r in '
-                        'the specification' % (self.lastStep, self.firstStep))
-                lastStepFound = True
+            stepNames.add(step['name'])
 
             if 'dependencies' in step:
                 dependencies = step['dependencies']
@@ -358,31 +347,77 @@ class SlurmPipeline(object):
 
                 # All named dependencies must already have been specified.
                 for dependency in dependencies:
-                    if dependency not in self.steps:
+                    if dependency not in stepNames:
                         raise SpecificationError(
                             'Step %d depends on a non-existent (or '
                             'not-yet-defined) step: %r' % (count, dependency))
 
-        if self.firstStep is not None and not firstStepFound:
-            raise SpecificationError(
-                'The firstStep %r was not found in the specification' %
-                self.firstStep)
-
-        if self.lastStep is not None and not lastStepFound:
-            raise SpecificationError(
-                'The lastStep %r was not found in the specification' %
-                self.lastStep)
-
-    def toJSON(self):
+    def _checkRuntime(self, steps, firstStep=None, lastStep=None, skip=None):
         """
-        Return the specification as a JSON string.
+        Check that a proposed scheduling makes sense.
 
-        @return: A C{str} giving the specification in JSON form.
+        @param steps: An C{OrderedDict} of specification steps, keyed by step
+            name.
+        @param firstStep: If not C{None}, the name of the first specification
+            step to execute.
+        @param lastStep: If not C{None}, the name of the last specification
+            step to execute.
+        @param skip: A C{set} of C{str} step names that should be skipped.
+        @raise SchedulingError: if the last step occurs before the first, if
+            the last or first step are unknown, or if asked to skip a
+            non-existent step.
+        @return: An C{OrderedDict} keyed by specification step name,
+            with values that are C{self.specification} step dicts. This
+            provides convenient / direct access to steps by name.
         """
-        copy = self.specification.copy()
-        for step in copy['steps']:
+        firstStepFound = False
+
+        if firstStep is not None and firstStep not in steps:
+            raise SchedulingError(
+                'First step %r not found in specification' % firstStep)
+
+        if lastStep is not None and lastStep not in steps:
+            raise SchedulingError(
+                'Last step %r not found in specification' % lastStep)
+
+        for step in steps.values():
+            if step['name'] == firstStep:
+                firstStepFound = True
+
+            if step['name'] == lastStep:
+                if firstStep is not None and not firstStepFound:
+                    raise SchedulingError(
+                        'Last step (%r) occurs before first step (%r) in '
+                        'the specification' % (lastStep, firstStep))
+
+        if skip:
+            unknownSteps = skip - set(steps)
+            if unknownSteps:
+                raise SchedulingError(
+                    'Unknown skip step%s (%s) passed to schedule' % (
+                        '' if len(unknownSteps) == 1 else 's',
+                        ', '.join(sorted(unknownSteps))))
+
+    @staticmethod
+    def specificationToJSON(specification):
+        """
+        Convert a specification to a JSON string.
+
+        @param specification: A specification C{dict}. This parameter is not
+            modified.
+        @return: A C{str} giving C{specification} in JSON form.
+        """
+        specification = specification.copy()
+
+        # Convert sets to lists and the steps ordered dictionary into a list.
+        specification['skip'] = list(specification['skip'])
+        steps = []
+        for step in specification['steps'].values():
             for taskName, jobIds in step['tasks'].items():
                 step['tasks'][taskName] = list(sorted(jobIds))
             for taskName, jobIds in step['taskDependencies'].items():
                 step['taskDependencies'][taskName] = list(sorted(jobIds))
-        return dumps(copy, sort_keys=True, indent=2, separators=(',', ': '))
+            steps.append(step)
+        specification['steps'] = steps
+        return dumps(specification, sort_keys=True, indent=2,
+                     separators=(',', ': '))
