@@ -90,8 +90,8 @@ class SlurmPipeline(object):
         nSteps = len(steps)
         if nSteps and lastStep is not None and firstStep is None:
             firstStep = specification['steps'][0]['name']
-        self._checkRuntime(steps, firstStep, lastStep, skip)
         skip = set(skip or ())
+        self._checkRuntime(steps, firstStep, lastStep, skip)
         specification.update({
             'force': force,
             'firstStep': firstStep,
