@@ -47,10 +47,10 @@ parser.add_argument(
 
 args, scriptArgs = parser.parse_known_args()
 
-sp = SlurmPipeline(args.specification, force=args.force,
-                   firstStep=args.firstStep, lastStep=args.lastStep,
-                   sleep=args.sleep, scriptArgs=scriptArgs)
+sp = SlurmPipeline(args.specification)
 
-sp.schedule(skip=(set(args.skip) if args.skip else None))
+status = sp.schedule(force=args.force, firstStep=args.firstStep,
+                     lastStep=args.lastStep, sleep=args.sleep,
+                     scriptArgs=scriptArgs, skip=args.skip)
 
-print(sp.toJSON())
+print(sp.specificationToJSON(status))

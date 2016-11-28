@@ -73,7 +73,7 @@ class SlurmPipeline(object):
             for no sleep.
         @param scriptArgs: A C{list} of C{str} arguments that should be put on
             the command line of all steps that have no dependencies.
-        @param skip: A C{set} of C{str} step names that should be skipped.
+        @param skip: An iterable of C{str} step names that should be skipped.
             Those step scripts will still be run, but will have C{SP_SKIP=1}
             in their environment. Steps may also be skipped by using
             C{skip: "true"} in the pipeline specification file.
@@ -91,7 +91,7 @@ class SlurmPipeline(object):
         if nSteps and lastStep is not None and firstStep is None:
             firstStep = specification['steps'][0]['name']
         self._checkRuntime(steps, firstStep, lastStep, skip)
-        skip = skip or set()
+        skip = set(skip or ())
         specification.update({
             'force': force,
             'firstStep': firstStep,
