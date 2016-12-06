@@ -3,7 +3,6 @@ from unittest import TestCase
 from six.moves import builtins
 from six import assertRaisesRegex, PY3
 from json import dumps
-import subprocess
 import platform
 
 from slurm_pipeline.pipeline import (
@@ -314,16 +313,18 @@ class TestRunner(TestCase):
         If SlurmPipeline is passed a firstStep value that doesn't match
         any of the specification steps, a SpecificationError must be raised.
         """
-        error = "^The firstStep 'xxx' was not found in the specification$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name1',
-                                      'script': 'script',
-                                  },
-                              ]
-                          }, firstStep='xxx')
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script',
+                    },
+                ]
+            })
+        error = "^First step 'xxx' not found in specification$"
+        assertRaisesRegex(self, SchedulingError, error, runner.schedule,
+                          firstStep='xxx')
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -332,16 +333,18 @@ class TestRunner(TestCase):
         If SlurmPipeline is passed a lastStep value that doesn't match
         any of the specification steps, a SpecificationError must be raised.
         """
-        error = "^The lastStep 'xxx' was not found in the specification$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name1',
-                                      'script': 'script',
-                                  },
-                              ]
-                          }, lastStep='xxx')
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script',
+                    },
+                ]
+            })
+        error = "^Last step 'xxx' not found in specification$"
+        assertRaisesRegex(self, SchedulingError, error, runner.schedule,
+                          lastStep='xxx')
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -350,21 +353,23 @@ class TestRunner(TestCase):
         If SlurmPipeline is passed a lastStep value that occurs before the
         first step, a SpecificationError must be raised.
         """
-        error = ("^The lastStep 'name1' occurs before the firstStep 'name2' "
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                ]
+            })
+        error = ("^Last step \('name1'\) occurs before first step \('name2'\) "
                  "in the specification$")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name1',
-                                      'script': 'script',
-                                  },
-                                  {
-                                      'name': 'name2',
-                                      'script': 'script',
-                                  },
-                              ]
-                          }, firstStep='name2', lastStep='name1')
+        assertRaisesRegex(self, SchedulingError, error, runner.schedule,
+                          firstStep='name2', lastStep='name1')
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -389,13 +394,6 @@ class TestRunner(TestCase):
         mockOpener = mockOpen(read_data=data)
         with patch.object(builtins, 'open', mockOpener):
             runner = SlurmPipeline('file')
-            # Add keys to the expected specification to match what
-            # SlurmPipeline.__init__ does.
-            specification.update({
-                'force': False,
-                'firstStep': None,
-                'lastStep': None,
-            })
             self.assertEqual(specification, runner.specification)
 
     def testScheduledTime(self):
@@ -408,163 +406,147 @@ class TestRunner(TestCase):
                 'steps': [],
             })
         self.assertNotIn('scheduledAt', runner.specification)
-        runner.schedule()
-        self.assertIsInstance(runner.specification['scheduledAt'], float)
+        specification = runner.schedule()
+        self.assertIsInstance(specification['scheduledAt'], float)
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testReSchedule(self, existsMock, accessMock):
-        """
-        Trying to re-schedule an execution that has already been scheduled must
-        result in a SchedulingError.
-        """
-        with patch.object(subprocess, 'check_output',
-                          return_value='Submitted batch job 4\n'):
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                    ],
-                })
-            runner.schedule()
-            error = '^Specification has already been scheduled$'
-            assertRaisesRegex(self, SchedulingError, error,
-                              runner.schedule)
-
-    @patch('os.access')
-    @patch('os.path.exists')
-    def testRepeatedTaskName(self, existsMock, accessMock):
+    def testRepeatedTaskName(self, existsMock, accessMock, subprocessMock):
         """
         If a step script outputs a duplicated task name, the job ids
         it outputs must be collected correctly.
         """
-        with patch.object(subprocess, 'check_output',
-                          return_value=('TASK: xxx 123 456\n'
-                                        'TASK: xxx 123 567\n')):
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                    ],
-                })
-            runner.schedule()
-            self.assertEqual(
-                {
-                    'xxx': {123, 456, 567},
-                },
-                runner.steps['name1']['tasks'])
+        subprocessMock.return_value = ('TASK: xxx 123 456\n'
+                                       'TASK: xxx 123 567\n')
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        specification = runner.schedule()
+        self.assertEqual(
+            {
+                'xxx': {123, 456, 567},
+            },
+            specification['steps']['name1']['tasks'])
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testRepeatedTaskJobId(self, existsMock, accessMock):
+    def testRepeatedTaskJobId(self, existsMock, accessMock, subprocessMock):
         """
         If a step script outputs a duplicated job id for a task name, a
         SchedulingError must be raised.
         """
-        with patch.object(subprocess, 'check_output',
-                          return_value='TASK: xxx 123 123\n'):
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                    ],
-                })
-            error = ("^Task name 'xxx' was output with a duplicate in "
-                     "its job ids \[123, 123\] by 'script1' script in "
-                     "step named 'name1'$")
-            assertRaisesRegex(self, SchedulingError, error,
-                              runner.schedule)
+        subprocessMock.return_value = 'TASK: xxx 123 123\n'
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        error = ("^Task name 'xxx' was output with a duplicate in "
+                 "its job ids \[123, 123\] by 'script1' script in "
+                 "step named 'name1'$")
+        assertRaisesRegex(self, SchedulingError, error, runner.schedule)
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testTasksFollowingSchedule(self, existsMock, accessMock):
+    def testTasksFollowingSchedule(self, existsMock, accessMock,
+                                   subprocessMock):
         """
         If a step script outputs information about tasks it has started, these
         must be correctly recorded in the step dictionary.
         """
-        with patch.object(subprocess, 'check_output',
-                          return_value=('TASK: xxx 123 456\n'
-                                        'TASK: yyy 234 567\n')):
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                    ],
-                })
-            runner.schedule()
-            self.assertEqual(
-                {
-                    'xxx': {123, 456},
-                    'yyy': {234, 567},
-                },
-                runner.steps['name1']['tasks'])
+        subprocessMock.return_value = ('TASK: xxx 123 456\n'
+                                       'TASK: yyy 234 567\n')
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        specification = runner.schedule()
+        self.assertEqual(
+            {
+                'xxx': {123, 456},
+                'yyy': {234, 567},
+            },
+            specification['steps']['name1']['tasks'])
 
+    @patch('time.time')
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testTaskScheduleTime(self, existsMock, accessMock):
+    def testTaskScheduleTime(self, existsMock, accessMock, subprocessMock,
+                             timeMock):
         """
         After a step script is scheduled, a float 'scheduledAt' key must be
         added to its step dict.
         """
-        with patch.object(subprocess, 'check_output',
-                          return_value=('TASK: xxx 123 456\n'
-                                        'TASK: yyy 234 567\n')):
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                    ],
-                })
-            step = runner.steps['name1']
-            self.assertNotIn('scheduledAt', step)
-            runner.schedule()
-            self.assertIsInstance(step['scheduledAt'], float)
+        timeMock.return_value = 10.0
+        subprocessMock.return_value = ('TASK: xxx 123 456\n'
+                                       'TASK: yyy 234 567\n')
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        specification = runner.schedule()
+        self.assertEqual(
+            specification['steps']['name1']['scheduledAt'], 10.0)
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testStepStdout(self, existsMock, accessMock):
+    def testStepStdout(self, existsMock, accessMock, subprocessMock):
         """
         When a step script is scheduled its standard output must be stored.
         """
-        with patch.object(subprocess, 'check_output',
-                          return_value=('TASK: xxx 123 456\n'
-                                        'Hello\n'
-                                        'TASK: yyy 234 567\n')):
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                    ],
-                })
-            runner.schedule()
-            self.assertEqual(
-                'TASK: xxx 123 456\nHello\nTASK: yyy 234 567\n',
-                runner.steps['name1']['stdout'])
+        subprocessMock.return_value = ('TASK: xxx 123 456\n'
+                                       'Hello\n'
+                                       'TASK: yyy 234 567\n')
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        specification = runner.schedule()
+        self.assertEqual(
+            'TASK: xxx 123 456\nHello\nTASK: yyy 234 567\n',
+            specification['steps']['name1']['stdout'])
 
+    @patch('time.time')
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testStepsDict(self, existsMock, accessMock):
+    def testStepsDict(self, existsMock, accessMock, subprocessMock, timeMock):
         """
         The specification must correctly set its 'steps' convenience dict.
         """
+        subprocessMock.return_value = 'output'
+        timeMock.return_value = 10.0
+
         runner = SlurmPipeline(
             {
                 'steps': [
@@ -578,23 +560,37 @@ class TestRunner(TestCase):
                     },
                 ],
             })
+        specification = runner.schedule()
         self.assertEqual(
             {
                 'name1': {
                     'name': 'name1',
                     'script': 'script1',
+                    'scheduledAt': 10.0,
+                    'simulate': False,
+                    'skip': False,
+                    'stdout': 'output',
+                    'taskDependencies': {},
+                    'tasks': {},
                 },
                 'name2': {
                     'name': 'name2',
+                    'scheduledAt': 10.0,
                     'script': 'script2',
+                    'simulate': False,
+                    'skip': False,
+                    'stdout': 'output',
+                    'taskDependencies': {},
+                    'tasks': {},
                 },
             },
-            runner.steps)
+            specification['steps'])
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testSingleDependencyTaskNamesJobIdsAndCalls(self, existsMock,
-                                                    accessMock):
+    def testSingleDependencyTaskNamesJobIdsAndCalls(
+            self, existsMock, accessMock, subprocessMock):
         """
         If a step has a dependency on one other step then after scheduling
         it must have its task dependency names and SLURM job ids set correctly
@@ -614,73 +610,73 @@ class TestRunner(TestCase):
                 else:
                     return ''
 
-        sideEffect = SideEffect()
+        subprocessMock.side_effect = SideEffect().sideEffect
 
-        with patch.object(subprocess, 'check_output') as mockMethod:
-            mockMethod.side_effect = sideEffect.sideEffect
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                        {
-                            'dependencies': ['name1'],
-                            'name': 'name2',
-                            'script': '/bin/script2',
-                        },
-                    ],
-                })
-            runner.schedule()
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'dependencies': ['name1'],
+                        'name': 'name2',
+                        'script': '/bin/script2',
+                    },
+                ],
+            })
+        specification = runner.schedule()
 
-            # Step 1 tasks and dependencies.
-            self.assertEqual(
-                {
-                    'aaa': {127, 450},
-                    'bbb': {238, 560},
-                },
-                runner.steps['name1']['tasks'])
-            self.assertEqual({}, runner.steps['name1']['taskDependencies'])
+        # Step 1 tasks and dependencies.
+        self.assertEqual(
+            {
+                'aaa': {127, 450},
+                'bbb': {238, 560},
+            },
+            specification['steps']['name1']['tasks'])
+        self.assertEqual(
+            {}, specification['steps']['name1']['taskDependencies'])
 
-            # Step 2 tasks and dependencies.
-            self.assertEqual({}, runner.steps['name2']['tasks'])
-            self.assertEqual(
-                {
-                    'aaa': {127, 450},
-                    'bbb': {238, 560},
-                },
-                runner.steps['name2']['taskDependencies'])
+        # Step 2 tasks and dependencies.
+        self.assertEqual({}, specification['steps']['name2']['tasks'])
+        self.assertEqual(
+            {
+                'aaa': {127, 450},
+                'bbb': {238, 560},
+            },
+            specification['steps']['name2']['taskDependencies'])
 
-            mockMethod.assert_has_calls([
-                call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                # /bin/script2 is run twice because it depends on
-                # 'name1', which starts two jobs (and name2 is not a
-                # collector step).
-                call(['/bin/script2', 'aaa'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['/bin/script2', 'bbb'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-            ])
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+            # /bin/script2 is run twice because it depends on
+            # 'name1', which starts two jobs (and name2 is not a
+            # collector step).
+            call(['/bin/script2', 'aaa'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+            call(['/bin/script2', 'bbb'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+        ])
 
-            # Check that the dependency environment variable is correct in
-            # all calls.
-            env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertNotIn('SP_DEPENDENCY_ARG', env1)
+        # Check that the dependency environment variable is correct in
+        # all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertNotIn('SP_DEPENDENCY_ARG', env1)
 
-            env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertEqual('--dependency=afterok:127,afterok:450',
-                             env2['SP_DEPENDENCY_ARG'])
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('--dependency=afterok:127,afterok:450',
+                         env2['SP_DEPENDENCY_ARG'])
 
-            env3 = mockMethod.mock_calls[2][2]['env']
-            self.assertEqual('--dependency=afterok:238,afterok:560',
-                             env3['SP_DEPENDENCY_ARG'])
+        env3 = subprocessMock.mock_calls[2][2]['env']
+        self.assertEqual('--dependency=afterok:238,afterok:560',
+                         env3['SP_DEPENDENCY_ARG'])
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
     def testSingleDependencySynchronousTaskNamesJobIdsAndCalls(
-            self, existsMock, accessMock):
+            self, existsMock, accessMock, subprocessMock):
         """
         If a step has a dependency on one other step then, after scheduling,
         it must have its task dependency names and SLURM job ids set correctly
@@ -702,73 +698,73 @@ class TestRunner(TestCase):
                 else:
                     return ''
 
-        sideEffect = SideEffect()
+        subprocessMock.side_effect = SideEffect().sideEffect
 
-        with patch.object(subprocess, 'check_output') as mockMethod:
-            mockMethod.side_effect = sideEffect.sideEffect
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                        {
-                            'dependencies': ['name1'],
-                            'name': 'name2',
-                            'script': '/bin/script2',
-                        },
-                    ],
-                })
-            runner.schedule()
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'dependencies': ['name1'],
+                        'name': 'name2',
+                        'script': '/bin/script2',
+                    },
+                ],
+            })
+        specification = runner.schedule()
 
-            # Step 1 tasks and dependencies. Two tasks were emitted, but
-            # they did not have job ids.
-            self.assertEqual(
-                {
-                    'aaa': set(),
-                    'bbb': set(),
-                },
-                runner.steps['name1']['tasks'])
-            self.assertEqual({}, runner.steps['name1']['taskDependencies'])
+        # Step 1 tasks and dependencies. Two tasks were emitted, but
+        # they did not have job ids.
+        self.assertEqual(
+            {
+                'aaa': set(),
+                'bbb': set(),
+            },
+            specification['steps']['name1']['tasks'])
+        self.assertEqual(
+            {}, specification['steps']['name1']['taskDependencies'])
 
-            # Step 2 tasks and dependencies. Two tasks were emitted by the
-            # step that is depended on, but they did not have job ids.
-            self.assertEqual({}, runner.steps['name2']['tasks'])
-            self.assertEqual(
-                {
-                    'aaa': set(),
-                    'bbb': set(),
-                },
-                runner.steps['name2']['taskDependencies'])
+        # Step 2 tasks and dependencies. Two tasks were emitted by the
+        # step that is depended on, but they did not have job ids.
+        self.assertEqual({}, specification['steps']['name2']['tasks'])
+        self.assertEqual(
+            {
+                'aaa': set(),
+                'bbb': set(),
+            },
+            specification['steps']['name2']['taskDependencies'])
 
-            mockMethod.assert_has_calls([
-                call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                # /bin/script2 is run twice because it depends on
-                # 'name1', which starts two jobs (and name2 is not a
-                # collector step).
-                call(['/bin/script2', 'aaa'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['/bin/script2', 'bbb'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-            ])
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+            # /bin/script2 is run twice because it depends on
+            # 'name1', which starts two jobs (and name2 is not a
+            # collector step).
+            call(['/bin/script2', 'aaa'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+            call(['/bin/script2', 'bbb'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+        ])
 
-            # Check that the dependency environment variable is not set in
-            # any call.
-            env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertNotIn('SP_DEPENDENCY_ARG', env1)
+        # Check that the dependency environment variable is not set in
+        # any call.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertNotIn('SP_DEPENDENCY_ARG', env1)
 
-            env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertNotIn('SP_DEPENDENCY_ARG', env2)
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertNotIn('SP_DEPENDENCY_ARG', env2)
 
-            env3 = mockMethod.mock_calls[2][2]['env']
-            self.assertNotIn('SP_DEPENDENCY_ARG', env3)
+        env3 = subprocessMock.mock_calls[2][2]['env']
+        self.assertNotIn('SP_DEPENDENCY_ARG', env3)
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testSingleCollectorDependencyTaskNamesAndJobIds(self, existsMock,
-                                                        accessMock):
+    def testSingleCollectorDependencyTaskNamesAndJobIds(
+            self, existsMock, accessMock, subprocessMock):
         """
         If a collect step has a dependency on two other steps then after
         scheduling it must have its task dependency names and SLURM job ids
@@ -789,122 +785,122 @@ class TestRunner(TestCase):
                 else:
                     return '\n'
 
-        sideEffect = SideEffect()
+        subprocessMock.side_effect = SideEffect().sideEffect
 
-        with patch.object(subprocess, 'check_output') as mockMethod:
-            mockMethod.side_effect = sideEffect.sideEffect
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                        {
-                            'name': 'name2',
-                            'script': 'script2',
-                        },
-                        {
-                            'collect': True,
-                            'dependencies': ['name1', 'name2'],
-                            'name': 'name3',
-                            'script': 'script3',
-                        },
-                    ],
-                })
-            runner.schedule()
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'collect': True,
+                        'dependencies': ['name1', 'name2'],
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            })
+        specification = runner.schedule()
 
-            # Step 1 tasks and dependencies.
-            self.assertEqual(
-                {
-                    'aaa': {127, 450},
-                    'bbb': {238, 560},
-                },
-                runner.steps['name1']['tasks'])
-            self.assertEqual({}, runner.steps['name1']['taskDependencies'])
+        # Step 1 tasks and dependencies.
+        self.assertEqual(
+            {
+                'aaa': {127, 450},
+                'bbb': {238, 560},
+            },
+            specification['steps']['name1']['tasks'])
+        self.assertEqual(
+            {}, specification['steps']['name1']['taskDependencies'])
 
-            # Step 2 tasks and dependencies.
-            self.assertEqual(
-                {
-                    'xxx': {123, 456},
-                    'yyy': {234, 567},
-                },
-                runner.steps['name2']['tasks'])
-            self.assertEqual({}, runner.steps['name2']['taskDependencies'])
+        # Step 2 tasks and dependencies.
+        self.assertEqual(
+            {
+                'xxx': {123, 456},
+                'yyy': {234, 567},
+            },
+            specification['steps']['name2']['tasks'])
+        self.assertEqual(
+            {}, specification['steps']['name2']['taskDependencies'])
 
-            # Step 3 tasks and dependencies.
-            self.assertEqual({}, runner.steps['name3']['tasks'])
-            self.assertEqual(
-                {
-                    'aaa': {127, 450},
-                    'bbb': {238, 560},
-                    'xxx': {123, 456},
-                    'yyy': {234, 567},
-                },
-                runner.steps['name3']['taskDependencies'])
+        # Step 3 tasks and dependencies.
+        self.assertEqual({}, specification['steps']['name3']['tasks'])
+        self.assertEqual(
+            {
+                'aaa': {127, 450},
+                'bbb': {238, 560},
+                'xxx': {123, 456},
+                'yyy': {234, 567},
+            },
+            specification['steps']['name3']['taskDependencies'])
 
-            # Check that check_output was called 3 times, with the
-            # expected arguments.
-            mockMethod.assert_has_calls([
-                call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script2'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script3', 'aaa', 'bbb', 'xxx', 'yyy'], cwd='.',
-                     stdin=DEVNULL, universal_newlines=True,
-                     env=ANY),
-            ])
+        # Check that check_output was called 3 times, with the
+        # expected arguments.
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+            call(['script2'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+            call(['script3', 'aaa', 'bbb', 'xxx', 'yyy'], cwd='.',
+                 stdin=DEVNULL, universal_newlines=True, env=ANY),
+        ])
 
-            # Check that the dependency environment variable we set is correct
-            # in all calls.
-            env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertNotIn('SP_DEPENDENCY_ARG', env1)
+        # Check that the dependency environment variable we set is correct
+        # in all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertNotIn('SP_DEPENDENCY_ARG', env1)
 
-            env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertNotIn('SP_DEPENDENCY_ARG', env2)
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertNotIn('SP_DEPENDENCY_ARG', env2)
 
-            env3 = mockMethod.mock_calls[2][2]['env']
-            self.assertEqual(
-                ('--dependency='
-                 'afterok:123,afterok:127,afterok:234,afterok:238,'
-                 'afterok:450,afterok:456,afterok:560,afterok:567'),
-                env3['SP_DEPENDENCY_ARG'])
-            self.assertEqual('', env3['SP_ORIGINAL_ARGS'])
+        env3 = subprocessMock.mock_calls[2][2]['env']
+        self.assertEqual(
+            ('--dependency='
+             'afterok:123,afterok:127,afterok:234,afterok:238,'
+             'afterok:450,afterok:456,afterok:560,afterok:567'),
+            env3['SP_DEPENDENCY_ARG'])
+        self.assertEqual('', env3['SP_ORIGINAL_ARGS'])
 
+    @patch('subprocess.check_output')
     @patch('os.path.abspath')
     @patch('os.access')
     @patch('os.path.exists')
     def testCwdWithRelativeScriptPath(self, existsMock, accessMock,
-                                      abspathMock):
+                                      abspathMock, subprocessMock):
         """
         If a step has a cwd set and its script is a relative path, the path of
         the executed script that is executed must be adjusted to be absolute.
         """
 
         abspathMock.return_value = '/fictional/path'
+        subprocessMock.return_value = ''
 
-        with patch.object(subprocess, 'check_output') as mockMethod:
-            mockMethod.return_value = ''
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'cwd': '/tmp',
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                    ],
-                })
-            runner.schedule()
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'cwd': '/tmp',
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        runner.schedule()
 
-            mockMethod.assert_has_calls([
-                call(['/fictional/path'], cwd='/tmp', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-            ])
+        subprocessMock.assert_has_calls([
+            call(['/fictional/path'], cwd='/tmp', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+        ])
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testScriptArgs(self, existsMock, accessMock):
+    def testScriptArgs(self, existsMock, accessMock, subprocessMock):
         """
         If script arguments are given to SlurmPipeline, they must be passed
         to the executed scripts that have no dependencies. Steps that have
@@ -924,239 +920,287 @@ class TestRunner(TestCase):
                 else:
                     return '\n'
 
-        sideEffect = SideEffect()
+        subprocessMock.side_effect = SideEffect().sideEffect
 
-        with patch.object(subprocess, 'check_output') as mockMethod:
-            mockMethod.side_effect = sideEffect.sideEffect
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                        {
-                            'name': 'name2',
-                            'script': 'script2',
-                        },
-                        {
-                            'dependencies': ['name1'],
-                            'name': 'name3',
-                            'script': 'script3',
-                        },
-                    ],
-                }, scriptArgs=['hey', 3])
-            runner.schedule()
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'dependencies': ['name1'],
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            })
+        runner.schedule(scriptArgs=['hey', 3])
 
-            mockMethod.assert_has_calls([
-                call(['script1', 'hey', '3'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script2', 'hey', '3'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script3', 'aaa'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script3', 'bbb'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-            ])
+        subprocessMock.assert_has_calls([
+            call(['script1', 'hey', '3'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+            call(['script2', 'hey', '3'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+            call(['script3', 'aaa'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+            call(['script3', 'bbb'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+        ])
 
-            # Check that the environment variables we set were correct
-            # in all calls.
-            env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertNotIn('SP_DEPENDENCY_ARG', env1)
-            self.assertEqual('hey 3', env1['SP_ORIGINAL_ARGS'])
-            self.assertEqual('0', env1['SP_FORCE'])
+        # Check that the environment variables we set were correct
+        # in all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertNotIn('SP_DEPENDENCY_ARG', env1)
+        self.assertEqual('hey 3', env1['SP_ORIGINAL_ARGS'])
+        self.assertEqual('0', env1['SP_FORCE'])
 
-            env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertNotIn('SP_DEPENDENCY_ARG', env2)
-            self.assertEqual('hey 3', env2['SP_ORIGINAL_ARGS'])
-            self.assertEqual('0', env2['SP_FORCE'])
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertNotIn('SP_DEPENDENCY_ARG', env2)
+        self.assertEqual('hey 3', env2['SP_ORIGINAL_ARGS'])
+        self.assertEqual('0', env2['SP_FORCE'])
 
-            env3 = mockMethod.mock_calls[2][2]['env']
-            self.assertEqual('--dependency=afterok:127,afterok:450',
-                             env3['SP_DEPENDENCY_ARG'])
-            self.assertEqual('hey 3', env3['SP_ORIGINAL_ARGS'])
-            self.assertEqual('0', env3['SP_FORCE'])
+        env3 = subprocessMock.mock_calls[2][2]['env']
+        self.assertEqual('--dependency=afterok:127,afterok:450',
+                         env3['SP_DEPENDENCY_ARG'])
+        self.assertEqual('hey 3', env3['SP_ORIGINAL_ARGS'])
+        self.assertEqual('0', env3['SP_FORCE'])
 
-            env4 = mockMethod.mock_calls[3][2]['env']
-            self.assertEqual('--dependency=afterok:238,afterok:560',
-                             env4['SP_DEPENDENCY_ARG'])
-            self.assertEqual('hey 3', env4['SP_ORIGINAL_ARGS'])
-            self.assertEqual('0', env4['SP_FORCE'])
+        env4 = subprocessMock.mock_calls[3][2]['env']
+        self.assertEqual('--dependency=afterok:238,afterok:560',
+                         env4['SP_DEPENDENCY_ARG'])
+        self.assertEqual('hey 3', env4['SP_ORIGINAL_ARGS'])
+        self.assertEqual('0', env4['SP_FORCE'])
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testForce(self, existsMock, accessMock):
+    def testForce(self, existsMock, accessMock, subprocessMock):
         """
         If force=True is given to SlurmPipeline, SP_FORCE must be set to '1'
         in the step execution environment.
         """
+        subprocessMock.return_value = ''
 
-        with patch.object(
-                subprocess, 'check_output', return_value='') as mockMethod:
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                    ],
-                }, force=True)
-            runner.schedule()
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        runner.schedule(force=True)
 
-            mockMethod.assert_has_calls([
-                call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-            ])
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+        ])
 
-            env = mockMethod.mock_calls[0][2]['env']
-            self.assertEqual('1', env['SP_FORCE'])
+        env = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('1', env['SP_FORCE'])
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testFirstStep(self, existsMock, accessMock):
+    def testFirstStepOnly(self, existsMock, accessMock, subprocessMock):
         """
-        If firstStep is specified for a SlurmPipeline the correct SP_SIMULATE
-        value must be set in the environment.
+        If firstStep (bot not lastStep) is specified for a SlurmPipeline the
+        correct SP_SIMULATE value must be set in the environment.
         """
-        with patch.object(
-                subprocess, 'check_output', return_value='') as mockMethod:
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                        {
-                            'name': 'name2',
-                            'script': 'script2',
-                        },
-                    ],
-                }, firstStep='name2')
-            runner.schedule()
+        subprocessMock.return_value = ''
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                ],
+            })
+        runner.schedule(firstStep='name2')
 
-            mockMethod.assert_has_calls([
-                call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script2'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-            ])
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script2'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+        ])
 
-            # Check that the SP_SIMULATE environment variable is correct in
-            # all calls.
-            env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertEqual('1', env1['SP_SIMULATE'])
+        # Check that the SP_SIMULATE environment variable is correct in
+        # all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('1', env1['SP_SIMULATE'])
 
-            env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertEqual('0', env2['SP_SIMULATE'])
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('0', env2['SP_SIMULATE'])
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testFirstStepAndLastStepDifferent(self, existsMock, accessMock):
+    def testLastStepOnly(self, existsMock, accessMock, subprocessMock):
+        """
+        If lastStep (but not firstStep) is specified for a SlurmPipeline the
+        correct SP_SIMULATE value must be set in the environment.
+        """
+        subprocessMock.return_value = ''
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            })
+        runner.schedule(lastStep='name2')
+
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script2'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script3'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+        ])
+
+        # Check that the SP_SIMULATE environment variable is correct in all
+        # calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('0', env1['SP_SIMULATE'])
+
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('0', env2['SP_SIMULATE'])
+
+        env2 = subprocessMock.mock_calls[2][2]['env']
+        self.assertEqual('1', env2['SP_SIMULATE'])
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testFirstStepAndLastStepDifferent(self, existsMock, accessMock,
+                                          subprocessMock):
         """
         If firstStep and lastStep are specified for a SlurmPipeline and the
         steps are not the same, the correct SP_SIMULATE value must be set
         correctly in the environment.
         """
-        with patch.object(
-                subprocess, 'check_output', return_value='') as mockMethod:
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                        {
-                            'name': 'name2',
-                            'script': 'script2',
-                        },
-                        {
-                            'name': 'name3',
-                            'script': 'script3',
-                        },
-                        {
-                            'name': 'name4',
-                            'script': 'script4',
-                        },
-                    ],
-                }, firstStep='name2', lastStep='name3')
-            runner.schedule()
+        subprocessMock.return_value = ''
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                    {
+                        'name': 'name4',
+                        'script': 'script4',
+                    },
+                ],
+            })
+        runner.schedule(firstStep='name2', lastStep='name3')
 
-            mockMethod.assert_has_calls([
-                call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script2'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script3'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script4'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-            ])
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script2'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script3'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script4'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+        ])
 
-            # Check that the SP_SIMULATE environment variable is correct in
-            # all calls.
-            env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertEqual('1', env1['SP_SIMULATE'])
+        # Check that the SP_SIMULATE environment variable is correct in
+        # all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('1', env1['SP_SIMULATE'])
 
-            env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertEqual('0', env2['SP_SIMULATE'])
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('0', env2['SP_SIMULATE'])
 
-            env3 = mockMethod.mock_calls[2][2]['env']
-            self.assertEqual('0', env3['SP_SIMULATE'])
+        env3 = subprocessMock.mock_calls[2][2]['env']
+        self.assertEqual('0', env3['SP_SIMULATE'])
 
-            env4 = mockMethod.mock_calls[3][2]['env']
-            self.assertEqual('1', env4['SP_SIMULATE'])
+        env4 = subprocessMock.mock_calls[3][2]['env']
+        self.assertEqual('1', env4['SP_SIMULATE'])
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testFirstStepAndLastStepSame(self, existsMock, accessMock):
+    def testFirstStepAndLastStepSame(self, existsMock, accessMock,
+                                     subprocessMock):
         """
         If firstStep and lastStep are specified for a SlurmPipeline and the
         steps are the same, the correct SP_SIMULATE value must be set
         correctly in the environment.
         """
-        with patch.object(
-                subprocess, 'check_output', return_value='') as mockMethod:
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                        {
-                            'name': 'name2',
-                            'script': 'script2',
-                        },
-                        {
-                            'name': 'name3',
-                            'script': 'script3',
-                        },
-                    ],
-                }, firstStep='name2', lastStep='name2')
-            runner.schedule()
+        subprocessMock.return_value = ''
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            })
+        runner.schedule(firstStep='name2', lastStep='name2')
 
-            mockMethod.assert_has_calls([
-                call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script2'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script3'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-            ])
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script2'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script3'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+        ])
 
-            # Check that the SP_SIMULATE environment variable is correct in
-            # all calls.
-            env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertEqual('1', env1['SP_SIMULATE'])
+        # Check that the SP_SIMULATE environment variable is correct in
+        # all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('1', env1['SP_SIMULATE'])
 
-            env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertEqual('0', env2['SP_SIMULATE'])
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('0', env2['SP_SIMULATE'])
 
-            env3 = mockMethod.mock_calls[2][2]['env']
-            self.assertEqual('1', env3['SP_SIMULATE'])
+        env3 = subprocessMock.mock_calls[2][2]['env']
+        self.assertEqual('1', env3['SP_SIMULATE'])
 
     @patch('subprocess.check_output')
     @patch('time.sleep')
@@ -1184,8 +1228,8 @@ class TestRunner(TestCase):
                         'script': 'script3',
                     },
                 ],
-            }, sleep=1.0)
-        runner.schedule()
+            })
+        runner.schedule(sleep=1.0)
 
         sleepMock.assert_has_calls([call(1.0), call(1.0)])
 
@@ -1248,8 +1292,8 @@ class TestRunner(TestCase):
                         'script': 'script3',
                     },
                 ],
-            }, sleep=0.0)
-        runner.schedule()
+            })
+        runner.schedule(sleep=0.0)
 
         self.assertFalse(sleepMock.called)
 
@@ -1261,7 +1305,7 @@ class TestRunner(TestCase):
         If the passed skip argument contains a non-existent step name, a
         SchedulingError must be raised.
         """
-        error = '^Unknown step \(xxx\) passed to schedule$'
+        error = '^Unknown skip step \(xxx\) passed to schedule$'
         runner = SlurmPipeline(
             {
                 'steps': [
@@ -1282,7 +1326,7 @@ class TestRunner(TestCase):
         If the passed skip argument contains two non-existent step names, a
         SchedulingError must be raised.
         """
-        error = '^Unknown steps \(xxx, yyy\) passed to schedule$'
+        error = '^Unknown skip steps \(xxx, yyy\) passed to schedule$'
         runner = SlurmPipeline(
             {
                 'steps': [
@@ -1295,96 +1339,155 @@ class TestRunner(TestCase):
         assertRaisesRegex(self, SchedulingError, error, runner.schedule,
                           skip={'xxx', 'yyy'})
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testSkipNone(self, existsMock, accessMock):
+    def testSkipNone(self, existsMock, accessMock, subprocessMock):
         """
         If no steps are skipped, the SP_SKIP environment variable must be 0
         in each step script.
         """
-        with patch.object(
-                subprocess, 'check_output', return_value='') as mockMethod:
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                        {
-                            'name': 'name2',
-                            'script': 'script2',
-                        },
-                        {
-                            'name': 'name3',
-                            'script': 'script3',
-                        },
-                    ],
-                })
-            runner.schedule()
+        subprocessMock.return_value = ''
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            })
+        runner.schedule()
 
-            mockMethod.assert_has_calls([
-                call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script2'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script3'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-            ])
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script2'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script3'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+        ])
 
-            # Check that the SP_SKIP environment variable is 0 in all calls.
-            env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertEqual('0', env1['SP_SKIP'])
+        # Check that the SP_SKIP environment variable is 0 in all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('0', env1['SP_SKIP'])
 
-            env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertEqual('0', env2['SP_SKIP'])
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('0', env2['SP_SKIP'])
 
-            env3 = mockMethod.mock_calls[2][2]['env']
-            self.assertEqual('0', env3['SP_SKIP'])
+        env3 = subprocessMock.mock_calls[2][2]['env']
+        self.assertEqual('0', env3['SP_SKIP'])
 
+    @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testSkipTwo(self, existsMock, accessMock):
+    def testSkipTwo(self, existsMock, accessMock, subprocessMock):
         """
         If two steps are skipped, the SP_SKIP variable in their environments
         must be set to 1.
         """
-        with patch.object(
-                subprocess, 'check_output', return_value='') as mockMethod:
-            runner = SlurmPipeline(
-                {
-                    'steps': [
-                        {
-                            'name': 'name1',
-                            'script': 'script1',
-                        },
-                        {
-                            'name': 'name2',
-                            'script': 'script2',
-                        },
-                        {
-                            'name': 'name3',
-                            'script': 'script3',
-                        },
-                    ],
-                })
-            runner.schedule(skip={'name2', 'name3'})
+        subprocessMock.return_value = ''
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            })
+        runner.schedule(skip={'name2', 'name3'})
 
-            mockMethod.assert_has_calls([
-                call(['script1'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script2'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-                call(['script3'], cwd='.', universal_newlines=True,
-                     stdin=DEVNULL, env=ANY),
-            ])
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script2'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script3'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+        ])
 
-            # Check that the SP_SKIP environment variable is 0 in all calls.
-            env1 = mockMethod.mock_calls[0][2]['env']
-            self.assertEqual('0', env1['SP_SKIP'])
+        # Check that the SP_SKIP environment variable is 0 in all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('0', env1['SP_SKIP'])
 
-            env2 = mockMethod.mock_calls[1][2]['env']
-            self.assertEqual('1', env2['SP_SKIP'])
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('1', env2['SP_SKIP'])
 
-            env3 = mockMethod.mock_calls[2][2]['env']
-            self.assertEqual('1', env3['SP_SKIP'])
+        env3 = subprocessMock.mock_calls[2][2]['env']
+        self.assertEqual('1', env3['SP_SKIP'])
+
+    @patch('subprocess.check_output')
+    @patch('time.time')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testJSON(self, existsMock, accessMock, timeMock, subprocessMock):
+        """
+        It must be possible to convert a scheduled specification to JSON.
+        """
+        subprocessMock.return_value = 'output'
+        timeMock.return_value = 10.0
+
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                ]
+            })
+        specification = runner.schedule(firstStep='name2', force=True)
+        expected = dumps(
+            {
+                'firstStep': 'name2',
+                'lastStep': None,
+                'force': True,
+                'scheduledAt': 10.0,
+                'scriptArgs': None,
+                'skip': [],
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'scheduledAt': 10.0,
+                        'script': 'script1',
+                        'simulate': True,
+                        'skip': False,
+                        'stdout': 'output',
+                        'taskDependencies': {},
+                        'tasks': {},
+                    },
+                    {
+                        'name': 'name2',
+                        'scheduledAt': 10.0,
+                        'script': 'script2',
+                        'simulate': False,
+                        'skip': False,
+                        'stdout': 'output',
+                        'taskDependencies': {},
+                        'tasks': {},
+                    },
+                ],
+            },
+            sort_keys=True, indent=2, separators=(',', ': '))
+        self.assertEqual(expected, runner.specificationToJSON(specification))
