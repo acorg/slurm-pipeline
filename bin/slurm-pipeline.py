@@ -34,6 +34,10 @@ parser.add_argument(
           'in which step scripts are executed.'))
 
 parser.add_argument(
+    '--skip', metavar='step-name', default=None, action='append',
+    help='Name a step that should be skipped. May be repeated.')
+
+parser.add_argument(
     '--sleep', type=float, default=0.0,
     help=('Specify the (floating point) number of seconds to sleep for '
           'between running step scripts. This can be used to allow a '
@@ -46,6 +50,7 @@ args, scriptArgs = parser.parse_known_args()
 sp = SlurmPipeline(args.specification, force=args.force,
                    firstStep=args.firstStep, lastStep=args.lastStep,
                    sleep=args.sleep, scriptArgs=scriptArgs)
-sp.schedule()
+
+sp.schedule(skip=(set(args.skip) if args.skip else None))
 
 print(sp.toJSON())

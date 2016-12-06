@@ -24,7 +24,9 @@ clean:
 	python setup.py clean
 	rm -fr slurm_pipeline.egg-info dist
 	make -C examples/word-count $@
+	make -C examples/word-count-with-skipping $@
 	make -C examples/blast $@
+	make -C examples/blast-with-force-and-simulate $@
 
 # The upload target requires that you have access rights to PYPI.
 upload:

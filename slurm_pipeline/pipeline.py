@@ -14,15 +14,15 @@ except ImportError:
 
 
 class SlurmPipelineError(Exception):
-    'Base class of all SlurmPipeline exceptions'
+    'Base class of all SlurmPipeline exceptions.'
 
 
 class SchedulingError(SlurmPipelineError):
-    'An error in scheduling execution'
+    'An error in scheduling execution.'
 
 
 class SpecificationError(SlurmPipelineError):
-    'An error was found in a specification'
+    'An error was found in a specification.'
 
 
 class SlurmPipeline(object):
@@ -38,18 +38,18 @@ class SlurmPipeline(object):
         variable SP_FORCE=1) that they may overwrite pre-existing result files.
         I.e., that --force was used on the slurm-pipeline.py command line.
     @param firstStep: If not C{None}, the name of the first specification step
-          to execute. Earlier steps will actually be executed but they will
-          have SP_SIMULATE=1 in their environment, allowing them to skip doing
-          actual work (while still emitting task names without job numbers so
-          that later steps receive the correct tasks to operate on.
+        to execute. Earlier steps will actually be executed but they will
+        have SP_SIMULATE=1 in their environment, allowing them to not do
+        actual work (while still emitting task names without job numbers so
+        that later steps receive the correct tasks to operate on.
     @param lastStep: If not C{None}, the name of the last specification step
-          to execute. See above docs for C{firstStep} for how this affects the
-          calling of step scripts.
+        to execute. See above docs for C{firstStep} for how this affects the
+        calling of step scripts.
     @param sleep: Gives the C{float} number of seconds to sleep for between
-          running step scripts. This can be used to allow a distributed file
-          system to settle, so that jobs that have been scheduled can be seen
-          when used as dependencies in later invocations of sbatch. Pass 0.0
-          for no sleep.
+        running step scripts. This can be used to allow a distributed file
+        system to settle, so that jobs that have been scheduled can be seen
+        when used as dependencies in later invocations of sbatch. Pass 0.0
+        for no sleep.
     @param scriptArgs: A C{list} of C{str} arguments that should be put on the
         command line of all steps that have no dependencies.
     """
@@ -82,14 +82,31 @@ class SlurmPipeline(object):
         self.specification['firstStep'] = firstStep
         self.specification['lastStep'] = lastStep
 
-    def schedule(self):
+    def schedule(self, skip=None):
         """
         Schedule the running of our execution specification.
+
+        @param skip: A C{set} of step names that should be skipped. Those step
+            scripts will still be run, but will have C{SP_SKIP=1} in their
+            environment. Steps may also be skipped by using C{skip: "true"} in
+            the pipeline specification file.
+        @raise SchedulingError: If the specification has already been scheduled
+            or if asked to skip a non-existent step.
         """
         if 'scheduledAt' in self.specification:
             raise SchedulingError('Specification has already been scheduled')
         else:
             self.specification['scheduledAt'] = time.time()
+
+            if skip:
+                unknownSteps = skip - set(self.steps)
+                if unknownSteps:
+                    raise SchedulingError(
+                        'Unknown step%s (%s) passed to schedule' % (
+                            '' if len(unknownSteps) == 1 else 's',
+                            ', '.join(sorted(unknownSteps))))
+            else:
+                skip = set()
 
             firstStepFound = lastStepFound = False
             nSteps = len(self.specification['steps'])
@@ -117,14 +134,16 @@ class SlurmPipeline(object):
                 else:
                     simulate = False
 
-                self._scheduleStep(step, simulate)
+                self._scheduleStep(
+                    step, simulate,
+                    step.get('skip') or step['name'] in skip)
 
                 # If we're supposed to pause between scheduling steps and
                 # this is not the last step, then sleep.
                 if self._sleep > 0.0 and stepIndex < nSteps - 1:
                     time.sleep(self._sleep)
 
-    def _scheduleStep(self, step, simulate):
+    def _scheduleStep(self, step, simulate, skip):
         """
         Schedule a single execution step.
 
@@ -132,6 +151,10 @@ class SlurmPipeline(object):
         @param simulate: If C{True}, this step should be simulated. The step
             script is still run, but with SP_SIMULATE=1 in its environment.
             Else, SP_SIMULATE=0 will be in the environment.
+        @param skip: If C{True}, the step should be skipped, which will be
+            indicated to the script by SP_SKIP=1 in its environment. SP_SKIP
+            will be 0 in non-skipped steps. It is up to the script, which is
+            run in either case, to decide how to behave.
         """
         assert 'scheduledAt' not in step
         assert 'tasks' not in step
@@ -155,6 +178,7 @@ class SlurmPipeline(object):
                 env = environ.copy()
                 env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
                 env['SP_SIMULATE'] = str(int(simulate))
+                env['SP_SKIP'] = str(int(skip))
                 dependencies = ','.join(
                     sorted(('afterok:%d' % jobId)
                            for jobIds in taskDependencies.values()
@@ -171,6 +195,7 @@ class SlurmPipeline(object):
                     env = environ.copy()
                     env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
                     env['SP_SIMULATE'] = str(int(simulate))
+                    env['SP_SKIP'] = str(int(skip))
                     jobIds = self.steps[stepName]['tasks'][taskName]
                     dependencies = ','.join(sorted(('afterok:%d' % jobId)
                                                    for jobId in jobIds))
@@ -193,6 +218,7 @@ class SlurmPipeline(object):
             env = environ.copy()
             env['SP_ORIGINAL_ARGS'] = self._scriptArgsStr
             env['SP_SIMULATE'] = str(int(simulate))
+            env['SP_SKIP'] = str(int(skip))
             env.pop('SP_DEPENDENCY_ARG', None)
             self._runStepScript(step, args, env)
 

@@ -1,4 +1,4 @@
-.PHONY: run clean
+.PHONY: run, sh, clean
 
 run:
 	@test -e output || mkdir output

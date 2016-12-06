@@ -1252,3 +1252,139 @@ class TestRunner(TestCase):
         runner.schedule()
 
         self.assertFalse(sleepMock.called)
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testSkipNonexistentStep(self, existsMock, accessMock, subprocessMock):
+        """
+        If the passed skip argument contains a non-existent step name, a
+        SchedulingError must be raised.
+        """
+        error = '^Unknown step \(xxx\) passed to schedule$'
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name',
+                        'script': 'script',
+                    },
+                ]
+            })
+        assertRaisesRegex(self, SchedulingError, error, runner.schedule,
+                          skip={'xxx'})
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testSkipNonexistentSteps(self, existsMock, accessMock, subprocessMock):
+        """
+        If the passed skip argument contains two non-existent step names, a
+        SchedulingError must be raised.
+        """
+        error = '^Unknown steps \(xxx, yyy\) passed to schedule$'
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name',
+                        'script': 'script',
+                    },
+                ]
+            })
+        assertRaisesRegex(self, SchedulingError, error, runner.schedule,
+                          skip={'xxx', 'yyy'})
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testSkipNone(self, existsMock, accessMock):
+        """
+        If no steps are skipped, the SP_SKIP environment variable must be 0
+        in each step script.
+        """
+        with patch.object(
+                subprocess, 'check_output', return_value='') as mockMethod:
+            runner = SlurmPipeline(
+                {
+                    'steps': [
+                        {
+                            'name': 'name1',
+                            'script': 'script1',
+                        },
+                        {
+                            'name': 'name2',
+                            'script': 'script2',
+                        },
+                        {
+                            'name': 'name3',
+                            'script': 'script3',
+                        },
+                    ],
+                })
+            runner.schedule()
+
+            mockMethod.assert_has_calls([
+                call(['script1'], cwd='.', universal_newlines=True,
+                     stdin=DEVNULL, env=ANY),
+                call(['script2'], cwd='.', universal_newlines=True,
+                     stdin=DEVNULL, env=ANY),
+                call(['script3'], cwd='.', universal_newlines=True,
+                     stdin=DEVNULL, env=ANY),
+            ])
+
+            # Check that the SP_SKIP environment variable is 0 in all calls.
+            env1 = mockMethod.mock_calls[0][2]['env']
+            self.assertEqual('0', env1['SP_SKIP'])
+
+            env2 = mockMethod.mock_calls[1][2]['env']
+            self.assertEqual('0', env2['SP_SKIP'])
+
+            env3 = mockMethod.mock_calls[2][2]['env']
+            self.assertEqual('0', env3['SP_SKIP'])
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testSkipTwo(self, existsMock, accessMock):
+        """
+        If two steps are skipped, the SP_SKIP variable in their environments
+        must be set to 1.
+        """
+        with patch.object(
+                subprocess, 'check_output', return_value='') as mockMethod:
+            runner = SlurmPipeline(
+                {
+                    'steps': [
+                        {
+                            'name': 'name1',
+                            'script': 'script1',
+                        },
+                        {
+                            'name': 'name2',
+                            'script': 'script2',
+                        },
+                        {
+                            'name': 'name3',
+                            'script': 'script3',
+                        },
+                    ],
+                })
+            runner.schedule(skip={'name2', 'name3'})
+
+            mockMethod.assert_has_calls([
+                call(['script1'], cwd='.', universal_newlines=True,
+                     stdin=DEVNULL, env=ANY),
+                call(['script2'], cwd='.', universal_newlines=True,
+                     stdin=DEVNULL, env=ANY),
+                call(['script3'], cwd='.', universal_newlines=True,
+                     stdin=DEVNULL, env=ANY),
+            ])
+
+            # Check that the SP_SKIP environment variable is 0 in all calls.
+            env1 = mockMethod.mock_calls[0][2]['env']
+            self.assertEqual('0', env1['SP_SKIP'])
+
+            env2 = mockMethod.mock_calls[1][2]['env']
+            self.assertEqual('1', env2['SP_SKIP'])
+
+            env3 = mockMethod.mock_calls[2][2]['env']
+            self.assertEqual('1', env3['SP_SKIP'])
