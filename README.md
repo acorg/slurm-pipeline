@@ -459,6 +459,53 @@ line yourself, with and without `--force` and using `--firstStep` and
 
  Use `make clean` to get rid of the intermediate files.
 
+### Two collect scripts
+
+Another scenario you may want to deal with might involve a first phase of
+data processing, followed by grouping the initial processing, and then a
+second phase based on these groups. The `examples/double-collect` example
+illustrates such a situation.
+
+In this example, we imagine we've run an experiment and have data on 5
+species: cat, cow, dog, mosquito, and tick. We've taken some sort of
+measurement on each and stored the results into files `data/cat`,
+`data/cow`, etc. In the first phase we want to add up all the numbers for
+each species and print the number of observations and their total. In the
+second phase we want to compute the sum and mean for two categories, the
+vertebrates and invertebrates.
+
+The categories are defined in a simple text file, `categories`:
+
+The `0-start.sh` script emits a task name for each species (based on files
+found in the `data` directory).  `1-species-count.sh` receives a species
+name and does the first phase of counting, leaving its output in
+`output/NAME.result` where `NAME` is the species name. The next script,
+`2-category-emit.sh`, a collect script, runs when all the tasks given to
+`1-species-count.sh` have finished. This step just emits a set of new task
+names, `vertebrate` and `invertebrate` (taken from the `categories`
+file). It doesn't do any work, it's just acting as a coordination step
+between the end of the first phase and the start of the second. The next
+step `3-category-count.sh`, receives a category name as its task and looks
+in the `categories` file to see which phase one files it should
+examine. The final output is written to `output/SUMMARY`:
+
+    Category vertebrate:
+    10 observations, total 550, mean 55.00
+
+    Category invertebrate:
+    5 observations, total 75, mean 15.00
+
+Note that in this example in the first phase task names are species names
+but in the second phase they are category names. In the first phase there
+are 5 tasks being worked on (cat, cow, dog, mosquito, and tick) and in the
+second phase just two (vertebrate, invertebrate). You can think of the
+`2-category-emit.sh` script as absorbing the initial five tasks and
+generating two new ones. The initial tasks are absorbed because the
+`2-category-emit.sh` does not emit their names.
+
+Use `make` to run the example. Then look at the files in the `output`
+directory. Run `make clean` to clean up.
+
 ### A more realistic example
 
 Another example can be seen in another of my repos,
