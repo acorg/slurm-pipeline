@@ -1491,3 +1491,76 @@ class TestRunner(TestCase):
             },
             sort_keys=True, indent=2, separators=(',', ': '))
         self.assertEqual(expected, runner.specificationToJSON(specification))
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testErrorStepWithNoDependencies(self, existsMock, accessMock):
+        """
+        If the specification steps contains an error step that does not have
+        any dependencies, a SpecificationError must be raised because error
+        steps only exist for the purposed of catching failed dependencies.
+        """
+        error = '^Step "xx" is an error step but has no "dependencies" key$'
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
+                          {
+                              'steps': [
+                                  {
+                                      'error step': True,
+                                      'name': 'xx',
+                                      'script': 'script',
+                                  },
+                              ]
+                          })
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testErrorStep(self, existsMock, accessMock, subprocessMock):
+        """
+        If a step is an error step its script must be run with the expected
+        value of SP_DEPENDENCY_ARG.
+        """
+
+        class SideEffect(object):
+            def __init__(self):
+                self.first = True
+
+            def sideEffect(self, *args, **kwargs):
+                if self.first:
+                    self.first = False
+                    return ('TASK: aaa 127 450\n'
+                            'TASK: bbb 238 560\n')
+                else:
+                    return ''
+
+        subprocessMock.side_effect = SideEffect().sideEffect
+
+        runner = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'dependencies': ['name1'],
+                        'error step': True,
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                ],
+            })
+        runner.schedule()
+
+        # Check that the dependency environment variable is correct in
+        # all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertNotIn('SP_DEPENDENCY_ARG', env1)
+
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('--dependency=afternotok:127?afternotok:450',
+                         env2['SP_DEPENDENCY_ARG'])
+
+        env3 = subprocessMock.mock_calls[2][2]['env']
+        self.assertEqual('--dependency=afternotok:238?afternotok:560',
+                         env3['SP_DEPENDENCY_ARG'])

@@ -199,6 +199,8 @@ the full list:
 * `collect`: for scripts that should run only when all tasks from all their
   prerequisites have completed.
 * `dependencies`: a list of previous steps that a step depends on.
+* `error step`: if `true` the step script will only be run if one of its
+  dependencies fails.
 * `skip`: if `true`, the step script will be run with `SP_SKIP=1` in its
   environment. Otherwise, `SP_SKIP` will always be set and will be `0`.
 
