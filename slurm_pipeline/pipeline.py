@@ -159,6 +159,13 @@ class SlurmPipeline(object):
         step['skip'] = skip
         scriptArgsStr = ' '.join(map(str, scriptArgs)) if scriptArgs else ''
 
+        if step.get('error step', False):
+            separator = '?'
+            after = 'afternotok'
+        else:
+            separator = ','
+            after = 'afterok'
+
         # taskDependencies is keyed by task name. These are the tasks
         # started by the steps that the current step depends on.  Its
         # values are sets of SLURM job ids the tasks that step started and
@@ -178,8 +185,8 @@ class SlurmPipeline(object):
                 env['SP_ORIGINAL_ARGS'] = scriptArgsStr
                 env['SP_SIMULATE'] = str(int(simulate))
                 env['SP_SKIP'] = str(int(skip))
-                dependencies = ','.join(
-                    sorted(('afterok:%d' % jobId)
+                dependencies = separator.join(
+                    sorted(('%s:%d' % (after, jobId))
                            for jobIds in taskDependencies.values()
                            for jobId in jobIds))
                 if dependencies:
@@ -196,8 +203,9 @@ class SlurmPipeline(object):
                     env['SP_SIMULATE'] = str(int(simulate))
                     env['SP_SKIP'] = str(int(skip))
                     jobIds = steps[stepName]['tasks'][taskName]
-                    dependencies = ','.join(sorted(('afterok:%d' % jobId)
-                                                   for jobId in jobIds))
+                    dependencies = separator.join(
+                        sorted(('%s:%d' % (after, jobId))
+                               for jobId in jobIds))
                     if dependencies:
                         env['SP_DEPENDENCY_ARG'] = ('--dependency=' +
                                                     dependencies)
@@ -351,6 +359,11 @@ class SlurmPipeline(object):
                         raise SpecificationError(
                             'Step %d depends on a non-existent (or '
                             'not-yet-defined) step: %r' % (count, dependency))
+
+            if 'error step' in step and 'dependencies' not in step:
+                    raise SpecificationError(
+                        'Step "%s" is an error step but has no "dependencies" '
+                        'key' % (step['name']))
 
     def _checkRuntime(self, steps, firstStep=None, lastStep=None, skip=None):
         """
