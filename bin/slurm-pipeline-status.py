@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 """
 Use the SlurmPipelineStatus class to print a status report of a job
 that has already been scheduled, given an in-progress job specification
@@ -21,8 +23,14 @@ parser.add_argument(
     help=('The name of the file containing the pipeline status, '
           'in JSON format.'))
 
+parser.add_argument(
+    '--squeueArgs', nargs='*', default=None,
+    help=("A list of arguments to pass to squeue (including the squeue "
+          "command itself). If not specified, the user's login name will "
+          "be appended to squeue -u."))
+
 args = parser.parse_args()
 
 status = SlurmPipelineStatus(args.specification)
 
-print(status.specificationToJSON(status.specification))
+print(status.toStr(args.squeueArgs))
