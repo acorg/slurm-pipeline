@@ -8,7 +8,7 @@ except ImportError:
 
 from slurm_pipeline.error import SpecificationError
 from slurm_pipeline.squeue import SQueue
-from slurm_pipeline.status import SlurmPipelineStatus
+from slurm_pipeline.status import SlurmPipelineStatus, secondsToTime
 
 
 class TestSlurmPipelineStatus(TestCase):
@@ -518,3 +518,15 @@ Step 5: stop
   Simulate: False
   Skip: False''',
             sps.toStr())
+
+
+class TestSecondsToTime(TestCase):
+    """
+    Tests for the secondsToTime function.
+    """
+    def testArbitraryTime(self):
+        """
+        The secondsToTime function must return the expected value.
+        """
+        self.assertEqual('2016-12-10 14:20:58',
+                         secondsToTime(1481379658.5455897))
