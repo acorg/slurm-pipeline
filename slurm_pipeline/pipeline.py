@@ -2,38 +2,22 @@ import os
 from os import path, environ
 import re
 import time
-from six import string_types
-from json import load, dumps
 import subprocess
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 
 try:
     from subprocess import DEVNULL  # py3k
 except ImportError:
     DEVNULL = open(os.devnull, 'r+b')
 
-
-class SlurmPipelineError(Exception):
-    'Base class of all SlurmPipeline exceptions.'
-
-
-class SchedulingError(SlurmPipelineError):
-    'An error in scheduling execution.'
+from .base import SlurmPipelineBase
+from .error import SchedulingError, SpecificationError
 
 
-class SpecificationError(SlurmPipelineError):
-    'An error was found in a specification.'
-
-
-class SlurmPipeline(object):
+class SlurmPipeline(SlurmPipelineBase):
     """
     Read a pipeline execution specification and make it possible to schedule
     it via SLURM.
-
-    @param specification: Either a C{str} giving the name of a file containing
-        a JSON execution specification, or a C{dict} holding a correctly
-        formatted execution specification. Note that in the latter case the
-        passed specification C{dict} will be modified by this script.
     """
 
     # In script output, look for lines of the form
@@ -42,11 +26,30 @@ class SlurmPipeline(object):
     # job ids. The following regex just matches the first part of that.
     TASK_NAME_LINE = re.compile('^TASK:\s+(\S+)\s*')
 
-    def __init__(self, specification):
-        if isinstance(specification, string_types):
-            specification = self._loadSpecification(specification)
-        self._checkSpecification(specification)
-        self.specification = specification
+    def checkSpecification(self):
+        """
+        Check an execution specification is syntactically as expected.
+
+        @raise SpecificationError: if there is anything wrong with the
+            specification.
+        """
+        if 'scheduledAt' in self.specification:
+            raise SpecificationError(
+                "The specification has a top-level 'scheduledAt' key, "
+                'but was not passed as a status specification')
+
+        for count, step in enumerate(self.specification['steps'], start=1):
+            if not path.exists(step['script']):
+                raise SpecificationError(
+                    'The script %r in step %d does not exist' %
+                    (step['script'], count))
+
+            if not os.access(step['script'], os.X_OK):
+                raise SpecificationError(
+                    'The script %r in step %d is not executable' %
+                    (step['script'], count))
+
+        SlurmPipelineBase.checkSpecification(self)
 
     def schedule(self, force=False, firstStep=None, lastStep=None, sleep=0.0,
                  scriptArgs=None, skip=None):
@@ -82,14 +85,11 @@ class SlurmPipeline(object):
         @return: A specification C{dict}. This is a copy of the original
             specification, updated with information about this scheduling.
         """
-        specification = self.specification.copy()
-        # steps is keyed by (ordered) specification step name, with values
-        # that are specification step dicts. This provides convenient
-        # direct access to steps by name.
-        steps = OrderedDict((s['name'], s) for s in specification['steps'])
+        specification = self.specification
+        steps = specification['steps']
         nSteps = len(steps)
         if nSteps and lastStep is not None and firstStep is None:
-            firstStep = specification['steps'][0]['name']
+            firstStep = list(specification['steps'])[0]
         skip = set(skip or ())
         self._checkRuntime(steps, firstStep, lastStep, skip)
         specification.update({
@@ -276,96 +276,8 @@ class SlurmPipeline(object):
                         (taskName, jobIds, script, step['name']))
                 tasks[taskName].update(jobIds)
 
-    def _loadSpecification(self, specificationFile):
-        """
-        Load a JSON execution specification.
-
-        @param specificationFile: A C{str} file name containing a JSON
-            execution specification.
-        @raise ValueError: Will be raised (by L{json.load}) if
-            C{specificationFile} does not contain valid JSON.
-        @return: The parsed JSON specification as a C{dict}.
-        """
-        with open(specificationFile) as fp:
-            return load(fp)
-
-    def _checkSpecification(self, specification):
-        """
-        Check an execution specification is syntactically as expected.
-
-        @param specification: A C{dict} containing an execution specification.
-        @raise SpecificationError: if there is anything wrong with the
-            specification.
-        """
-        stepNames = set()
-
-        if not isinstance(specification, dict):
-            raise SpecificationError('The specification must be a dict (i.e., '
-                                     'a JSON object when loaded from a file)')
-
-        if 'steps' not in specification:
-            raise SpecificationError(
-                'The specification must have a top-level "steps" key')
-
-        if not isinstance(specification['steps'], list):
-            raise SpecificationError('The "steps" key must be a list')
-
-        for count, step in enumerate(specification['steps'], start=1):
-            if not isinstance(step, dict):
-                raise SpecificationError('Step %d is not a dictionary' % count)
-
-            if 'script' not in step:
-                raise SpecificationError(
-                    'Step %d does not have a "script" key' % count)
-
-            if not isinstance(step['script'], string_types):
-                raise SpecificationError(
-                    'The "script" key in step %d is not a string' % count)
-
-            if not path.exists(step['script']):
-                raise SpecificationError(
-                    'The script %r in step %d does not exist' %
-                    (step['script'], count))
-
-            if not os.access(step['script'], os.X_OK):
-                raise SpecificationError(
-                    'The script %r in step %d is not executable' %
-                    (step['script'], count))
-
-            if 'name' not in step:
-                raise SpecificationError(
-                    'Step %d does not have a "name" key' % count)
-
-            if not isinstance(step['name'], string_types):
-                raise SpecificationError(
-                    'The "name" key in step %d is not a string' % count)
-
-            if step['name'] in stepNames:
-                raise SpecificationError(
-                    'The name %r of step %d was already used in '
-                    'an earlier step' % (step['name'], count))
-
-            stepNames.add(step['name'])
-
-            if 'dependencies' in step:
-                dependencies = step['dependencies']
-                if not isinstance(dependencies, list):
-                    raise SpecificationError(
-                        'Step %d has a non-list "dependencies" key' % count)
-
-                # All named dependencies must already have been specified.
-                for dependency in dependencies:
-                    if dependency not in stepNames:
-                        raise SpecificationError(
-                            'Step %d depends on a non-existent (or '
-                            'not-yet-defined) step: %r' % (count, dependency))
-
-            if 'error step' in step and 'dependencies' not in step:
-                    raise SpecificationError(
-                        'Step "%s" is an error step but has no "dependencies" '
-                        'key' % (step['name']))
-
-    def _checkRuntime(self, steps, firstStep=None, lastStep=None, skip=None):
+    @staticmethod
+    def _checkRuntime(steps, firstStep=None, lastStep=None, skip=None):
         """
         Check that a proposed scheduling makes sense.
 
@@ -380,8 +292,8 @@ class SlurmPipeline(object):
             the last or first step are unknown, or if asked to skip a
             non-existent step.
         @return: An C{OrderedDict} keyed by specification step name,
-            with values that are C{self.specification} step dicts. This
-            provides convenient / direct access to steps by name.
+            with values that are step C{dict}s. This provides convenient /
+            direct access to steps by name.
         """
         firstStepFound = False
 
@@ -410,27 +322,3 @@ class SlurmPipeline(object):
                     'Unknown skip step%s (%s) passed to schedule' % (
                         '' if len(unknownSteps) == 1 else 's',
                         ', '.join(sorted(unknownSteps))))
-
-    @staticmethod
-    def specificationToJSON(specification):
-        """
-        Convert a specification to a JSON string.
-
-        @param specification: A specification C{dict}. This parameter is not
-            modified.
-        @return: A C{str} giving C{specification} in JSON form.
-        """
-        specification = specification.copy()
-
-        # Convert sets to lists and the steps ordered dictionary into a list.
-        specification['skip'] = list(specification['skip'])
-        steps = []
-        for step in specification['steps'].values():
-            for taskName, jobIds in step['tasks'].items():
-                step['tasks'][taskName] = list(sorted(jobIds))
-            for taskName, jobIds in step['taskDependencies'].items():
-                step['taskDependencies'][taskName] = list(sorted(jobIds))
-            steps.append(step)
-        specification['steps'] = steps
-        return dumps(specification, sort_keys=True, indent=2,
-                     separators=(',', ': '))

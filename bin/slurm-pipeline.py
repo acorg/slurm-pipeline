@@ -1,18 +1,25 @@
 #!/usr/bin/env python
 
+"""
+Use the SlurmPipeline class to schedule the running of a pipeline job from its
+specification, printing (to stdout) a detailed specification that includes job
+ids. The status can be saved to a file and later given to
+slurm-pipeline-status.py to monitor job progress.
+"""
+
 import argparse
 
 from slurm_pipeline import SlurmPipeline
 
 
 parser = argparse.ArgumentParser(
-    description='Schedule the execution of a pipeline on SLURM',
+    description='Schedule the execution of a pipeline on SLURM.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument(
-    '--specification', '-s', metavar='specification.json',
+    '--specification', '-s', metavar='specification.json', required=True,
     help=('The name of the file containing the pipeline specification, '
-          'in JSON format'))
+          'in JSON format.'))
 
 parser.add_argument(
     '--force', '-f', action='store_true', default=False,
@@ -47,7 +54,7 @@ parser.add_argument(
 
 args, scriptArgs = parser.parse_known_args()
 
-sp = SlurmPipeline(args.specification)
+sp = SlurmPipeline(args.specification, status=False)
 
 status = sp.schedule(force=args.force, firstStep=args.firstStep,
                      lastStep=args.lastStep, sleep=args.sleep,

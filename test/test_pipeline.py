@@ -1,115 +1,24 @@
 from os import X_OK
 from unittest import TestCase
-from six.moves import builtins
-from six import assertRaisesRegex, PY3
+from six import assertRaisesRegex
 from json import dumps
 import platform
 
-from slurm_pipeline.pipeline import (
-    SlurmPipeline, SpecificationError, SchedulingError, DEVNULL)
+from slurm_pipeline.pipeline import SlurmPipeline, DEVNULL
+from slurm_pipeline.error import SchedulingError, SpecificationError
 
 try:
     from unittest.mock import ANY, call, patch
 except ImportError:
     from mock import ANY, call, patch
 
-from .mocking import mockOpen
-
 PYPY = platform.python_implementation() == 'PyPy'
 
 
-class TestRunner(TestCase):
+class TestSlurmPipeline(TestCase):
     """
-    Tests for the pipeline.runner.SlurmPipeline class.
+    Tests for the slurm_pipeline.pipeline.SlurmPipeline class.
     """
-
-    def testEmptyJSON(self):
-        """
-        If the specification file is empty, a ValueError must be raised.
-        """
-        data = ''
-        mockOpener = mockOpen(read_data=data)
-        with patch.object(builtins, 'open', mockOpener):
-            if PY3:
-                error = '^Expecting value: line 1 column 1 \(char 0\)$'
-            elif PYPY:
-                # The error message in the exception has a NUL in it.
-                error = ("^No JSON object could be decoded: unexpected "
-                         "'\\000' at char 0$")
-            else:
-                error = '^No JSON object could be decoded$'
-            assertRaisesRegex(self, ValueError, error, SlurmPipeline, 'file')
-
-    def testInvalidJSON(self):
-        """
-        If the specification file does not contain valid JSON, a ValueError
-        must be raised.
-        """
-        data = '{'
-        mockOpener = mockOpen(read_data=data)
-        with patch.object(builtins, 'open', mockOpener):
-            if PY3:
-                error = ('^Expecting property name enclosed in double '
-                         'quotes: line 1 column 2 \(char 1\)$')
-            elif PYPY:
-                # The error message in the exception has a NUL in it.
-                error = ("^No JSON object could be decoded: unexpected "
-                         "'\\000' at char 0$")
-            else:
-                error = '^Expecting object: line 1 column 1 \(char 0\)$'
-            assertRaisesRegex(self, ValueError, error, SlurmPipeline, 'file')
-
-    def testJSONList(self):
-        """
-        If the specification file contains valid JSON but is a list instead
-        of a JSON object, a SpecificationError must be raised.
-        """
-        data = '[]'
-        mockOpener = mockOpen(read_data=data)
-        with patch.object(builtins, 'open', mockOpener):
-            error = ('^The specification must be a dict \(i\.e\., a JSON '
-                     'object when loaded from a file\)$')
-            assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                              'file')
-
-    def testList(self):
-        """
-        If the specification is passed a list directly instead of a dict, a
-        SpecificationError must be raised.
-        """
-        error = ('^The specification must be a dict \(i\.e\., a JSON '
-                 'object when loaded from a file\)$')
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline, [])
-
-    def testNoSteps(self):
-        """
-        If the specification dict does not contain a 'steps' key, a
-        SpecificationError must be raised.
-        """
-        error = '^The specification must have a top-level "steps" key$'
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline, {})
-
-    def testStepsMustBeAList(self):
-        """
-        If the specification dict does not contain a 'steps' key whose value
-        is a list, a SpecificationError must be raised.
-        """
-        error = '^The "steps" key must be a list$'
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {'steps': None})
-
-    def testNonDictionaryStep(self):
-        """
-        If the specification steps contains a step that is not a dict, a
-        SpecificationError must be raised.
-        """
-        error = '^Step 1 is not a dictionary$'
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  None,
-                              ]
-                          })
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -130,41 +39,6 @@ class TestRunner(TestCase):
         existsMock.assert_called_once_with('script')
         accessMock.assert_called_once_with('script', X_OK)
 
-    @patch('os.access')
-    @patch('os.path.exists')
-    def testStepWithoutScript(self, existsMock, accessMock):
-        """
-        If the specification steps contains a step that does not have a
-        'script' key, a SpecificationError must be raised.
-        """
-        error = '^Step 2 does not have a "script" key$'
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name',
-                                      'script': 'script',
-                                  },
-                                  {
-                                  },
-                              ]
-                          })
-
-    def testNonStringScript(self):
-        """
-        If a step has a 'script' key that is not a string, a SpecificationError
-        must be raised.
-        """
-        error = '^The "script" key in step 1 is not a string$'
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'script': None,
-                                  },
-                              ]
-                          })
-
     def testNonexistentScript(self):
         """
         If a step has a 'script' key that mentions a non-existent file, a
@@ -182,138 +56,12 @@ class TestRunner(TestCase):
 
     @patch('os.access')
     @patch('os.path.exists')
-    def testStepWithoutName(self, existsMock, accessMock):
-        """
-        If the specification steps contains a step that does not have a
-        'name' key, a SpecificationError must be raised.
-        """
-        error = '^Step 1 does not have a "name" key$'
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
-
-    @patch('os.access')
-    @patch('os.path.exists')
-    def testNonStringName(self, existsMock, accessMock):
-        """
-        If a step has a 'name' key that is not a string, a SpecificationError
-        must be raised.
-        """
-        error = '^The "name" key in step 1 is not a string$'
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': None,
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
-
-    @patch('os.access')
-    @patch('os.path.exists')
-    def testDuplicateName(self, existsMock, accessMock):
-        """
-        If two steps have the same name, a SpecificationError must be raised.
-        specification.
-        """
-        error = ("^The name 'name' of step 2 was already used in an "
-                 "earlier step$")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name',
-                                      'script': 'script1',
-                                  },
-                                  {
-                                      'name': 'name',
-                                      'script': 'script2',
-                                  },
-                              ],
-                          })
-
-    @patch('os.access')
-    @patch('os.path.exists')
-    def testNonListDependencies(self, existsMock, accessMock):
-        """
-        If a step has a 'dependencies' key that is not a list, a
-        SpecificationError must be raised.
-        """
-        error = '^Step 1 has a non-list "dependencies" key$'
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'dependencies': None,
-                                      'name': 'name',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
-
-    @patch('os.access')
-    @patch('os.path.exists')
-    def testNonExistentDependency(self, existsMock, accessMock):
-        """
-        If a step has a 'dependencies' key that mentions an unknown step,
-        a SpecificationError must be raised.
-        """
-        error = ("^Step 2 depends on a non-existent \(or not-yet-"
-                 "defined\) step: 'unknown'$")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name1',
-                                      'script': 'script',
-                                  },
-                                  {
-                                      'dependencies': ['unknown'],
-                                      'name': 'name2',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
-
-    @patch('os.access')
-    @patch('os.path.exists')
-    def testNonYetDefinedDependency(self, existsMock, accessMock):
-        """
-        If a step has a 'dependencies' key that mentions a step that exists
-        but that has not yet been defined in the specification steps, a
-        SpecificationError must be raised.
-        """
-        error = ("^Step 1 depends on a non-existent \(or not-yet-"
-                 "defined\) step: 'name2'$")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'dependencies': ['name2'],
-                                      'name': 'name1',
-                                      'script': 'script',
-                                  },
-                                  {
-                                      'name': 'name2',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
-
-    @patch('os.access')
-    @patch('os.path.exists')
     def testNonexistentFirstStep(self, existsMock, accessMock):
         """
         If SlurmPipeline is passed a firstStep value that doesn't match
         any of the specification steps, a SpecificationError must be raised.
         """
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -323,7 +71,7 @@ class TestRunner(TestCase):
                 ]
             })
         error = "^First step 'xxx' not found in specification$"
-        assertRaisesRegex(self, SchedulingError, error, runner.schedule,
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
                           firstStep='xxx')
 
     @patch('os.access')
@@ -333,7 +81,7 @@ class TestRunner(TestCase):
         If SlurmPipeline is passed a lastStep value that doesn't match
         any of the specification steps, a SpecificationError must be raised.
         """
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -343,7 +91,7 @@ class TestRunner(TestCase):
                 ]
             })
         error = "^Last step 'xxx' not found in specification$"
-        assertRaisesRegex(self, SchedulingError, error, runner.schedule,
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
                           lastStep='xxx')
 
     @patch('os.access')
@@ -353,7 +101,7 @@ class TestRunner(TestCase):
         If SlurmPipeline is passed a lastStep value that occurs before the
         first step, a SpecificationError must be raised.
         """
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -368,46 +116,33 @@ class TestRunner(TestCase):
             })
         error = ("^Last step \('name1'\) occurs before first step \('name2'\) "
                  "in the specification$")
-        assertRaisesRegex(self, SchedulingError, error, runner.schedule,
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
                           firstStep='name2', lastStep='name1')
-
-    @patch('os.access')
-    @patch('os.path.exists')
-    def testSpecificationIsStored(self, existsMock, accessMock):
-        """
-        If well-formed JSON is passed, it must be read and stored as the
-        specification.
-        """
-        specification = {
-            'steps': [
-                {
-                    'name': 'name1',
-                    'script': 'script1',
-                },
-                {
-                    'name': 'name2',
-                    'script': 'script2',
-                },
-            ],
-        }
-        data = dumps(specification)
-        mockOpener = mockOpen(read_data=data)
-        with patch.object(builtins, 'open', mockOpener):
-            runner = SlurmPipeline('file')
-            self.assertEqual(specification, runner.specification)
 
     def testScheduledTime(self):
         """
         After a specification is scheduled, a float 'scheduledAt' key must be
         added to the specification.
         """
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [],
             })
-        self.assertNotIn('scheduledAt', runner.specification)
-        specification = runner.schedule()
+        self.assertNotIn('scheduledAt', sp.specification)
+        specification = sp.schedule()
         self.assertIsInstance(specification['scheduledAt'], float)
+
+    def testAlreadyScheduled(self):
+        """
+        If a specification with a top-level 'scheduledAt' key is passed to
+        SlurmPipeline, a SpecificationError must be raised.
+        """
+        error = ("^The specification has a top-level 'scheduledAt' key, but "
+                 'was not passed as a status specification$')
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline, {
+            'scheduledAt': None,
+            'steps': [],
+        })
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -419,7 +154,7 @@ class TestRunner(TestCase):
         """
         subprocessMock.return_value = ('TASK: xxx 123 456\n'
                                        'TASK: xxx 123 567\n')
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -428,7 +163,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        specification = runner.schedule()
+        specification = sp.schedule()
         self.assertEqual(
             {
                 'xxx': {123, 456, 567},
@@ -444,7 +179,7 @@ class TestRunner(TestCase):
         SchedulingError must be raised.
         """
         subprocessMock.return_value = 'TASK: xxx 123 123\n'
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -456,7 +191,7 @@ class TestRunner(TestCase):
         error = ("^Task name 'xxx' was output with a duplicate in "
                  "its job ids \[123, 123\] by 'script1' script in "
                  "step named 'name1'$")
-        assertRaisesRegex(self, SchedulingError, error, runner.schedule)
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule)
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -469,7 +204,7 @@ class TestRunner(TestCase):
         """
         subprocessMock.return_value = ('TASK: xxx 123 456\n'
                                        'TASK: yyy 234 567\n')
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -478,7 +213,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        specification = runner.schedule()
+        specification = sp.schedule()
         self.assertEqual(
             {
                 'xxx': {123, 456},
@@ -499,7 +234,7 @@ class TestRunner(TestCase):
         timeMock.return_value = 10.0
         subprocessMock.return_value = ('TASK: xxx 123 456\n'
                                        'TASK: yyy 234 567\n')
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -508,7 +243,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        specification = runner.schedule()
+        specification = sp.schedule()
         self.assertEqual(
             specification['steps']['name1']['scheduledAt'], 10.0)
 
@@ -522,7 +257,7 @@ class TestRunner(TestCase):
         subprocessMock.return_value = ('TASK: xxx 123 456\n'
                                        'Hello\n'
                                        'TASK: yyy 234 567\n')
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -531,7 +266,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        specification = runner.schedule()
+        specification = sp.schedule()
         self.assertEqual(
             'TASK: xxx 123 456\nHello\nTASK: yyy 234 567\n',
             specification['steps']['name1']['stdout'])
@@ -547,7 +282,7 @@ class TestRunner(TestCase):
         subprocessMock.return_value = 'output'
         timeMock.return_value = 10.0
 
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -560,7 +295,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        specification = runner.schedule()
+        specification = sp.schedule()
         self.assertEqual(
             {
                 'name1': {
@@ -612,7 +347,7 @@ class TestRunner(TestCase):
 
         subprocessMock.side_effect = SideEffect().sideEffect
 
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -626,7 +361,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        specification = runner.schedule()
+        specification = sp.schedule()
 
         # Step 1 tasks and dependencies.
         self.assertEqual(
@@ -700,7 +435,7 @@ class TestRunner(TestCase):
 
         subprocessMock.side_effect = SideEffect().sideEffect
 
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -714,7 +449,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        specification = runner.schedule()
+        specification = sp.schedule()
 
         # Step 1 tasks and dependencies. Two tasks were emitted, but
         # they did not have job ids.
@@ -787,7 +522,7 @@ class TestRunner(TestCase):
 
         subprocessMock.side_effect = SideEffect().sideEffect
 
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -806,7 +541,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        specification = runner.schedule()
+        specification = sp.schedule()
 
         # Step 1 tasks and dependencies.
         self.assertEqual(
@@ -880,7 +615,7 @@ class TestRunner(TestCase):
         abspathMock.return_value = '/fictional/path'
         subprocessMock.return_value = ''
 
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -890,7 +625,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule()
+        sp.schedule()
 
         subprocessMock.assert_has_calls([
             call(['/fictional/path'], cwd='/tmp', universal_newlines=True,
@@ -922,7 +657,7 @@ class TestRunner(TestCase):
 
         subprocessMock.side_effect = SideEffect().sideEffect
 
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -940,7 +675,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule(scriptArgs=['hey', 3])
+        sp.schedule(scriptArgs=['hey', 3])
 
         subprocessMock.assert_has_calls([
             call(['script1', 'hey', '3'], cwd='.', universal_newlines=True,
@@ -987,7 +722,7 @@ class TestRunner(TestCase):
         """
         subprocessMock.return_value = ''
 
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -996,7 +731,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule(force=True)
+        sp.schedule(force=True)
 
         subprocessMock.assert_has_calls([
             call(['script1'], cwd='.', universal_newlines=True,
@@ -1015,7 +750,7 @@ class TestRunner(TestCase):
         correct SP_SIMULATE value must be set in the environment.
         """
         subprocessMock.return_value = ''
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1028,7 +763,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule(firstStep='name2')
+        sp.schedule(firstStep='name2')
 
         subprocessMock.assert_has_calls([
             call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
@@ -1054,7 +789,7 @@ class TestRunner(TestCase):
         correct SP_SIMULATE value must be set in the environment.
         """
         subprocessMock.return_value = ''
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1071,7 +806,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule(lastStep='name2')
+        sp.schedule(lastStep='name2')
 
         subprocessMock.assert_has_calls([
             call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
@@ -1104,7 +839,7 @@ class TestRunner(TestCase):
         correctly in the environment.
         """
         subprocessMock.return_value = ''
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1125,7 +860,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule(firstStep='name2', lastStep='name3')
+        sp.schedule(firstStep='name2', lastStep='name3')
 
         subprocessMock.assert_has_calls([
             call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
@@ -1163,7 +898,7 @@ class TestRunner(TestCase):
         correctly in the environment.
         """
         subprocessMock.return_value = ''
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1180,7 +915,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule(firstStep='name2', lastStep='name2')
+        sp.schedule(firstStep='name2', lastStep='name2')
 
         subprocessMock.assert_has_calls([
             call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
@@ -1211,7 +946,7 @@ class TestRunner(TestCase):
         If a sleep argument is given to SlurmPipeline, sleep must be called
         between steps with the expected number of seconds.
         """
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1229,7 +964,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule(sleep=1.0)
+        sp.schedule(sleep=1.0)
 
         sleepMock.assert_has_calls([call(1.0), call(1.0)])
 
@@ -1243,7 +978,7 @@ class TestRunner(TestCase):
         If no sleep argument is given to SlurmPipeline, sleep must not be
         called.
         """
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1261,7 +996,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule()
+        sp.schedule()
 
         self.assertFalse(sleepMock.called)
 
@@ -1275,7 +1010,7 @@ class TestRunner(TestCase):
         If a sleep argument of 0.0 is given to SlurmPipeline, sleep must not be
         called.
         """
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1293,7 +1028,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule(sleep=0.0)
+        sp.schedule(sleep=0.0)
 
         self.assertFalse(sleepMock.called)
 
@@ -1306,7 +1041,7 @@ class TestRunner(TestCase):
         SchedulingError must be raised.
         """
         error = '^Unknown skip step \(xxx\) passed to schedule$'
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1315,7 +1050,7 @@ class TestRunner(TestCase):
                     },
                 ]
             })
-        assertRaisesRegex(self, SchedulingError, error, runner.schedule,
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
                           skip={'xxx'})
 
     @patch('subprocess.check_output')
@@ -1327,7 +1062,7 @@ class TestRunner(TestCase):
         SchedulingError must be raised.
         """
         error = '^Unknown skip steps \(xxx, yyy\) passed to schedule$'
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1336,7 +1071,7 @@ class TestRunner(TestCase):
                     },
                 ]
             })
-        assertRaisesRegex(self, SchedulingError, error, runner.schedule,
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
                           skip={'xxx', 'yyy'})
 
     @patch('subprocess.check_output')
@@ -1348,7 +1083,7 @@ class TestRunner(TestCase):
         in each step script.
         """
         subprocessMock.return_value = ''
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1365,7 +1100,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule()
+        sp.schedule()
 
         subprocessMock.assert_has_calls([
             call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
@@ -1395,7 +1130,7 @@ class TestRunner(TestCase):
         must be set to 1.
         """
         subprocessMock.return_value = ''
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1412,7 +1147,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule(skip={'name2', 'name3'})
+        sp.schedule(skip={'name2', 'name3'})
 
         subprocessMock.assert_has_calls([
             call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
@@ -1444,7 +1179,7 @@ class TestRunner(TestCase):
         subprocessMock.return_value = 'output'
         timeMock.return_value = 10.0
 
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1457,7 +1192,7 @@ class TestRunner(TestCase):
                     },
                 ]
             })
-        specification = runner.schedule(firstStep='name2', force=True)
+        specification = sp.schedule(firstStep='name2', force=True)
         expected = dumps(
             {
                 'firstStep': 'name2',
@@ -1490,7 +1225,7 @@ class TestRunner(TestCase):
                 ],
             },
             sort_keys=True, indent=2, separators=(',', ': '))
-        self.assertEqual(expected, runner.specificationToJSON(specification))
+        self.assertEqual(expected, sp.specificationToJSON(specification))
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -1500,7 +1235,8 @@ class TestRunner(TestCase):
         any dependencies, a SpecificationError must be raised because error
         steps only exist for the purposed of catching failed dependencies.
         """
-        error = '^Step "xx" is an error step but has no "dependencies" key$'
+        error = (
+            "^Step 1 \('xx'\) is an error step but has no 'dependencies' key$")
         assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
                           {
                               'steps': [
@@ -1535,7 +1271,7 @@ class TestRunner(TestCase):
 
         subprocessMock.side_effect = SideEffect().sideEffect
 
-        runner = SlurmPipeline(
+        sp = SlurmPipeline(
             {
                 'steps': [
                     {
@@ -1550,7 +1286,7 @@ class TestRunner(TestCase):
                     },
                 ],
             })
-        runner.schedule()
+        sp.schedule()
 
         # Check that the dependency environment variable is correct in
         # all calls.
