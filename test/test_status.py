@@ -21,7 +21,7 @@ class TestSlurmPipelineStatus(TestCase):
         If a specification without a top-level 'scheduledAt' key is passed to
         SlurmPipelineStatus, a SpecificationError must be raised.
         """
-        error = '^The specification status has no top-level "scheduledAt" key$'
+        error = "^The specification status has no top-level 'scheduledAt' key$"
         assertRaisesRegex(self, SpecificationError, error, SlurmPipelineStatus,
                           {})
 

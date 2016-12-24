@@ -17,10 +17,9 @@ class SlurmPipelineBase(object):
     """
     def __init__(self, specification):
         if isinstance(specification, string_types):
-            self.specification = self._loadSpecification(specification)
-        else:
-            self.specification = specification.copy()
-        self.checkSpecification()
+            specification = self._loadSpecification(specification)
+        self.checkSpecification(specification)
+        self.specification = specification.copy()
         # Change the 'steps' key in the specification into an ordered dict.
         # keyed by specification step name, with values that are the passed
         # specification step dicts. This gives more convenient direct
@@ -29,14 +28,15 @@ class SlurmPipelineBase(object):
         self.specification['steps'] = OrderedDict(
             (step['name'], step) for step in self.specification['steps'])
 
-    def checkSpecification(self):
+    @staticmethod
+    def checkSpecification(specification):
         """
         Check an execution specification is syntactically as expected.
 
+        @param specification: A C{dict} containing an execution specification.
         @raise SpecificationError: if there is anything wrong with the
             specification.
         """
-        specification = self.specification
         stepNames = set()
 
         if not isinstance(specification, dict):

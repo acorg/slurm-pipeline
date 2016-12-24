@@ -23,18 +23,20 @@ class SlurmPipelineStatus(SlurmPipelineBase):
     examining job ids, step status, etc.
     """
 
-    def checkSpecification(self):
+    @staticmethod
+    def checkSpecification(specification):
         """
         Check an execution specification is syntactically as expected.
 
+        @param specification: A C{dict} containing an execution specification.
         @raise SpecificationError: if there is anything wrong with the
             specification.
         """
-        if 'scheduledAt' not in self.specification:
+        if 'scheduledAt' not in specification:
             raise SpecificationError(
-                'The specification status has no top-level "scheduledAt" key')
+                "The specification status has no top-level 'scheduledAt' key")
 
-        SlurmPipelineBase.checkSpecification(self)
+        SlurmPipelineBase.checkSpecification(specification)
 
     def finalJobs(self, specification):
         """

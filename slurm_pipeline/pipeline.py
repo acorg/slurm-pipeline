@@ -26,19 +26,21 @@ class SlurmPipeline(SlurmPipelineBase):
     # job ids. The following regex just matches the first part of that.
     TASK_NAME_LINE = re.compile('^TASK:\s+(\S+)\s*')
 
-    def checkSpecification(self):
+    @staticmethod
+    def checkSpecification(specification):
         """
         Check an execution specification is syntactically as expected.
 
+        @param specification: A C{dict} containing an execution specification.
         @raise SpecificationError: if there is anything wrong with the
             specification.
         """
-        if 'scheduledAt' in self.specification:
+        if 'scheduledAt' in specification:
             raise SpecificationError(
                 "The specification has a top-level 'scheduledAt' key, "
                 'but was not passed as a status specification')
 
-        for count, step in enumerate(self.specification['steps'], start=1):
+        for count, step in enumerate(specification['steps'], start=1):
             if not path.exists(step['script']):
                 raise SpecificationError(
                     'The script %r in step %d does not exist' %
@@ -49,7 +51,7 @@ class SlurmPipeline(SlurmPipelineBase):
                     'The script %r in step %d is not executable' %
                     (step['script'], count))
 
-        SlurmPipelineBase.checkSpecification(self)
+        SlurmPipelineBase.checkSpecification(specification)
 
     def schedule(self, force=False, firstStep=None, lastStep=None, sleep=0.0,
                  scriptArgs=None, skip=None):
