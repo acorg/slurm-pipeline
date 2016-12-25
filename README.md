@@ -4,28 +4,34 @@ A Python class for scheduling and examining
 [SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
+Runs under Python 2.7, 3.5, and [pypy](http://pypy.org/).
+
+## Scripts
+
 The `bin` directory of this repo contains two Python scripts:
 
-* `slurm-pipeline.py` schedules programs to be run in an organized
-  pipeline fashion on a Linux cluster that uses SLURM as a workload
-  manager. Here "pipeline" means with an understanding of possibly complex
-  inter-program dependencies. This command prints a (JSON) status that is the
+* `slurm-pipeline.py` schedules programs to be run in an organized pipeline
+  fashion on a Linux cluster that uses SLURM as a workload manager. Here
+  "pipeline" means with an understanding of possibly complex inter-program
+  dependencies. `slurm-pipeline.py` must be given a JSON job specification
+  (see below). It prints a corresponding JSON status that contains the
   original specification plus information about the scheduling (times, job
   ids, etc).
-* `slurm-pipeline-status.py` is given a specification status (as
-  produced by `slurm-pipeline.py`) and prints a summary of the status,
+* `slurm-pipeline-status.py` must be given a specification status (as
+  produced by `slurm-pipeline.py`) and prints a summary of the status
   including job status (obtained from `squeue`). It can also be used to
-  just print a list of unfinished jobs (which is useful for cancelling a
-  specification) or a list of the final jobs from a speicification (which
-  is useful for making sure that jobs scheduled by a subsequent run of
+  print a list of unfinished jobs (useful for cancelling the jobs of a
+  running specification) or a list of the final jobs of a specification
+  (useful for making sure that jobs scheduled in a subsequent run of
   `slurm-pipeline.py` do not begin until the given specification has
   finished). See below for more information.
 
 ## Specification
 
-A pipeline run is schedule according to a specification file in JSON
-format. A couple of these can be seen in the `examples` directory of the
-repo. Here's an example,  `examples/word-count/specification.json`:
+A pipeline run is schedule according to a specification file in JSON format
+which is given to `slurm-pipeline.py`. Several examples of these can be
+found under [`examples`](examples). Here's the one from
+[`examples/word-count/specification.json`](examples/word-count/specification.json):
 
 ```json
 {
@@ -73,40 +79,40 @@ Optionally, a script may specify `collect` with a `true` value. This will
 cause the script to be run when all the *tasks* (see below) started by
 earlier dependent steps have completed.
 
-Optionally, a script may specify a `cwd` key with a value that is a
-directory that the script should be invoked from. If no directory is given,
-the script will be run in the directory where you invoke
-`slurm-pipeline.py`.
+The full list of specification directives can be found below.
 
 ## Tasks
 
-A step may choose to emit one or more *task*s. It does this by writing
-lines such as `TASK: xxx 39749 39750` to its standard output (this may
-change). This indicates that a task named `xxx` has been scheduled and that
-two SLURM jobs (with ids `39749` and `39750`) will be run to complete
-whatever work is needed for the task.
+A step script may emit one or more *task*s. It does this by writing lines
+such as `TASK: xxx 39749 39750` to its standard output. This indicates that
+a task named `xxx` has been scheduled and that two SLURM jobs (with ids
+`39749` and `39750`) will be run to complete whatever work is needed for
+the task.
 
-Any other output from a script is ignored (it is however stored in the
+A task name may be emitted multiple times by the same script.
+
+Any other output from a step script is ignored (it is however stored in the
 specification - see TODO, below).
 
 When a step depends on an earlier step (or steps), its `script` will be
 called with a single argument: the name of each task emitted by the earlier
 script (or scripts). If a step depends on multiple earlier steps that each
-emit the same task name, the script will only be called once with that task
-name but after all the tasks from all the dependent steps have finished.
+emit the same task name, the script will only be called once, with that
+task name as an argument, after all the jobs from all the dependent steps
+have finished.
 
-So, for example, a step that starts the processing of 10 FASTA files
-could emit the file names, to trigger ten downstream invocations of a
-dependent step's script.
+So, for example, a step that starts the processing of 10 FASTA files could
+emit the file names (as task names), which will cause ten subsequent
+invocations of any dependent step's script.
 
-If a script emits `TASK: xxx` with no job ids, the named task will be
+If a script emits `TASK: xxx` with no job id(s), the named task will be
 passed along the pipeline but dependent steps will not need to wait for any
 SLURM job to complete before being invoked. This is useful when a script
-can do some work synchronously (i.e., without scheduling via SLURM).
+does its work synchronously (i.e., without scheduling via SLURM).
 
-If a step uses `"collect": true`, its script will only be called once. The
-script's arguments will be the names of all tasks emitted by the steps it
-depends on.
+If a step specification uses `"collect": true`, its script will only be
+called once. The script's arguments will be the names of all tasks emitted
+by the steps it depends on.
 
 Steps that have no dependencies are called with whatever command-line
 arguments are given to `slurm-pipeline.py` (apart from the specification
@@ -133,8 +139,7 @@ The standard input of invoked scripts is closed.
 The file `status.json` produced by the above will contain the original
 specification, updated to contain information about the tasks that have
 been scheduled, their SLURM job ids, script output, timestamps, etc. See
-the `word-count` example below for sample output (and the TODO section for
-plans for using the updated specification).
+the `word-count` example below for sample output.
 
 ## slurm-pipeline.py options
 
@@ -218,7 +223,9 @@ the full list:
 
 * `name`: the name of the step (required).
 * `script`: the script to run (required).
-* `cwd`: the directory to run the script in.
+* `cwd`: the directory to run the script in. If no directory is given, the
+   script will be run in the directory where you invoke
+   `slurm-pipeline.py`.
 * `collect`: for scripts that should run only when all tasks from all their
   prerequisites have completed.
 * `dependencies`: a list of previous steps that a step depends on.
@@ -254,9 +261,9 @@ exectued:
   not. The entire pipeline might be simulated, in which case there is no
   issue if intermediate results are never computed.
 * `SP_DEPENDENCY_ARG` contains a string that must be used when the script
-  invokes `sbatch` to guarantee that the execution of the script does not
-  begin until after the tasks from all dependent steps have finished
-  successfully.
+  invokes [`sbatch`](https://slurm.schedmd.com/sbatch.html) to guarantee
+  that the execution of the script does not begin until after the tasks
+  from all dependent steps have finished successfully.
 
     The canonical way to use `SP_DEPENDENCY_ARG` in a step script is as
     follows:
@@ -270,8 +277,6 @@ exectued:
     simultaneously gets the job id from the `sbatch` output (`sbatch` prints a
     line like `Submitted batch job 3779695`) and the `cut` in the above pulls
     out just the job id. The task name is then emitted, along with the job id.
-
-    A task name may be emitted multiple times by the same script.
 
 ## Separation of concerns
 
@@ -675,20 +680,40 @@ installed. But it may be instructive to look at the specification file and
 the scripts. The scripts use `sbatch`, unlike those (described above) in
 the `examples` directory.
 
+## Limitations
+
+SLURM allows users to submit scripts for later execution. Thus there are
+two distinct phases of operation: the time of scheduling and the later
+time(s) of script excecution. When using `slurm-pipeline.py` it is
+important to understand this distinction.
+
+The reason is that `slurm-pipeline.py` only examines the output of
+scheduling scripts for task names and job ids. If a scheduling script calls
+`sbatch` to execute a later script, the output of that later script cannot
+be checked for `TASK: xxx 97322` style output because `slurm-pipeline.py`
+is completely unaware of the existence of that script. Thus all tasks and
+job dependencies must be established at the time of scheduling.
+
+Normally this is not an issue, as many pipelines fall nicely into the model
+used by `slurm-pipeline.py`. But sometimes it is necessary to write a step
+script that performs a slow synchronous operation in order to emit
+tasks. For example, you might have a very large input file that you want to
+process in smaller pieces. You can use `split` to break the file into
+pieces and emit task names such as `xaa`, `xab` etc, but you must do this
+synchronously (i.e., in the step script, not in a script submitted to
+`sbatch` by the step script to be executed some time later).
+
+In such cases, it may be advisable to allocate a compute node (using
+[`salloc`](https://slurm.schedmd.com/salloc.html)) to run
+`slurm-pipeline.py` on (instead of tying up a SLURM login node), or at
+least to run `slurm-pipeline.py` using `nice`.
+
 ## TODO
 
-* Make `slurm-pipeline.py` able to accept an in-progress specification
-  so it can report on output, tasks, job ids, completion, timing, etc.
 * Make it possible to pass the names (or at least the prefix) of the two
   environment variables (currently hard-coded as `SP_ORIGINAL_ARGS` and
   `SP_DEPENDENCY_ARG`) to the `SlurmPipeline` constructor.
-* Make it possible to pass a regex for matching task name and job id lines
-  in a script's stdout to the `SlurmPipeline` constructor (instead of
-  using the currently hard-coded `TASK: name jobid1 jobid2`).
-* (Possibly) arrange things so that scripts can write their task lines to
-  file descriptor 3 so as not to interfere with whatever they might
-  otherwise produce on `stdout` (or `stderr`).
-* Separate treatment of `stdout` and `stderr` from scripts.
-* Allow for steps to be error-processing ones, that handle failures in
-  their dependencies. Or allow a step to have both success and failure
-  scripts.
+* (Possibly) make it possible to pass a regex for matching task name and
+  job id lines in a script's stdout to the `SlurmPipeline` constructor
+  (instead of using the currently hard-coded `TASK: name
+  [jobid1 [jobid2 [...]]]`).
