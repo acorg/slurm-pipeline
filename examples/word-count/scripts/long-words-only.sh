@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 task=$1
 out=output/long-words-$task.out
