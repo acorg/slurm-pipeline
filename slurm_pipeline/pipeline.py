@@ -54,7 +54,7 @@ class SlurmPipeline(SlurmPipelineBase):
         SlurmPipelineBase.checkSpecification(specification)
 
     def schedule(self, force=False, firstStep=None, lastStep=None, sleep=0.0,
-                 scriptArgs=None, skip=None):
+                 scriptArgs=None, skip=None, startAfter=None):
         """
         Schedule the running of our execution specification.
 
@@ -82,6 +82,10 @@ class SlurmPipeline(SlurmPipelineBase):
             Those step scripts will still be run, but will have C{SP_SKIP=1}
             in their environment. Steps may also be skipped by using
             C{skip: "true"} in the pipeline specification file.
+        @param startAfter: A C{list} of C{int} job ids that must complete
+            (either successully or unsuccessully, it doesn't matter) before
+            steps in the current specification may start. If C{None}, steps in
+            the current specification may start immediately.
         @raise SchedulingError: If there is a problem with the first, last, or
             skipped steps, as determined by self._checkRuntime.
         @return: A specification C{dict}. This is a copy of the original
@@ -101,6 +105,7 @@ class SlurmPipeline(SlurmPipelineBase):
             'scheduledAt': time.time(),
             'scriptArgs': scriptArgs,
             'skip': skip,
+            'startAfter': startAfter,
             'steps': steps,
         })
 
@@ -131,7 +136,8 @@ class SlurmPipeline(SlurmPipelineBase):
                 simulate = False
 
             self._scheduleStep(stepName, steps, simulate, scriptArgs,
-                               stepName in skip or ('skip' in steps[stepName]))
+                               stepName in skip or ('skip' in steps[stepName]),
+                               startAfter)
 
             # If we're supposed to pause between scheduling steps and this
             # is not the last step, then sleep.
@@ -140,7 +146,8 @@ class SlurmPipeline(SlurmPipelineBase):
 
         return specification
 
-    def _scheduleStep(self, stepName, steps, simulate, scriptArgs, skip):
+    def _scheduleStep(self, stepName, steps, simulate, scriptArgs, skip,
+                      startAfter):
         """
         Schedule a single execution step.
 
@@ -154,6 +161,10 @@ class SlurmPipeline(SlurmPipelineBase):
             indicated to the script by SP_SKIP=1 in its environment. SP_SKIP
             will be 0 in non-skipped steps. It is up to the script, which is
             run in either case, to decide how to behave.
+        @param startAfter: A C{list} of C{int} job ids that must complete
+            (either successully or unsuccessully, it doesn't matter) before
+            steps in the current specification may start. If C{None}, steps in
+            the current specification may start immediately.
         """
         step = steps[stepName]
         step['tasks'] = defaultdict(set)
@@ -191,10 +202,7 @@ class SlurmPipeline(SlurmPipelineBase):
                     sorted(('%s:%d' % (after, jobId))
                            for jobIds in taskDependencies.values()
                            for jobId in jobIds))
-                if dependencies:
-                    env['SP_DEPENDENCY_ARG'] = '--dependency=' + dependencies
-                else:
-                    env.pop('SP_DEPENDENCY_ARG', None)
+                env['SP_DEPENDENCY_ARG'] = '--dependency=' + dependencies
                 self._runStepScript(step, sorted(taskDependencies), env)
             else:
                 # The script for this step gets run once for each task in the
@@ -218,17 +226,28 @@ class SlurmPipeline(SlurmPipelineBase):
             # Either this step has no dependencies or the steps it is
             # dependent on did not start any tasks. If there are no
             # dependencies, run the script with the originally passed
-            # command line arguments. If there were dependencies but no
-            # tasks have been started, run with no command line arguments.
-            if 'dependencies' in step or scriptArgs is None:
-                args = []
-            else:
-                args = list(map(str, scriptArgs))
+            # command line arguments (if any) and the --startAfter job
+            # dependencies (if any). If there were dependencies but no
+            # tasks have been started, run the step with no command line
+            # arguments.
+
             env = environ.copy()
+            if 'dependencies' in step:
+                args = []
+                env.pop('SP_DEPENDENCY_ARG', None)
+            else:
+                args = [] if scriptArgs is None else list(map(str, scriptArgs))
+                if startAfter:
+                    dependencies = ','.join(
+                        sorted(('afterany:%d' % jobId)
+                               for jobId in startAfter))
+                    env['SP_DEPENDENCY_ARG'] = '--dependency=' + dependencies
+                else:
+                    env.pop('SP_DEPENDENCY_ARG', None)
+
             env['SP_ORIGINAL_ARGS'] = scriptArgsStr
             env['SP_SIMULATE'] = str(int(simulate))
             env['SP_SKIP'] = str(int(skip))
-            env.pop('SP_DEPENDENCY_ARG', None)
             self._runStepScript(step, args, env)
 
         step['scheduledAt'] = time.time()

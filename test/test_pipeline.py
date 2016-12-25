@@ -22,6 +22,25 @@ class TestSlurmPipeline(TestCase):
 
     @patch('os.access')
     @patch('os.path.exists')
+    def testAccessFails(self, existsMock, accessMock):
+        """
+        If os.access fails, a SpecificationError must be raised.
+        """
+        accessMock.return_value = False
+
+        error = "^The script 'script' in step 1 is not executable$"
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
+                          {
+                              'steps': [
+                                  {
+                                      'name': 'name',
+                                      'script': 'script',
+                                  },
+                              ]
+                          })
+
+    @patch('os.access')
+    @patch('os.path.exists')
     def testAccessAndExistsAreCalled(self, existsMock, accessMock):
         """
         Both os.access and os.path.exists must be called as expected
@@ -50,6 +69,55 @@ class TestSlurmPipeline(TestCase):
                               'steps': [
                                   {
                                       'script': 'script',
+                                  },
+                              ]
+                          })
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testCollectStepWithNoDependencies(self, existsMock, accessMock):
+        """
+        If a specification has a 'collect' step with no dependencies,
+        a SpecificationError must be raised.
+        """
+        error = ("^Step 2 \('name2'\) is a 'collect' step but does not have "
+                 "any dependencies$")
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
+                          {
+                              'steps': [
+                                  {
+                                      'name': 'name1',
+                                      'script': 'script1',
+                                  },
+                                  {
+                                      'collect': True,
+                                      'name': 'name2',
+                                      'script': 'script2',
+                                  },
+                              ]
+                          })
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testCollectStepWithEmptyDependencies(self, existsMock, accessMock):
+        """
+        If a specification has a 'collect' step with a 'dependencies' key
+        whose value is the empty list, a SpecificationError must be raised.
+        """
+        error = ("^Step 2 \('name2'\) is a 'collect' step but does not have "
+                 "any dependencies$")
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
+                          {
+                              'steps': [
+                                  {
+                                      'name': 'name1',
+                                      'script': 'script1',
+                                  },
+                                  {
+                                      'collect': True,
+                                      'dependencies': [],
+                                      'name': 'name2',
+                                      'script': 'script2',
                                   },
                               ]
                           })
@@ -602,6 +670,68 @@ class TestSlurmPipeline(TestCase):
         self.assertEqual('', env3['SP_ORIGINAL_ARGS'])
 
     @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testSingleCollectorDependencyNoJobIds(
+            self, existsMock, accessMock, subprocessMock):
+        """
+        If a collect step has a dependency on two other steps but those steps
+        emit no jobs then the script for the step must be run with no
+        SP_DEPENDENCY_ARG value.
+        """
+
+        subprocessMock.return_value = ''
+
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'collect': True,
+                        'dependencies': ['name1', 'name2'],
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            })
+        sp.schedule()
+        env = subprocessMock.mock_calls[2][2]['env']
+        self.assertNotIn('SP_DEPENDENCY_ARG', env)
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testStartAfter(
+            self, existsMock, accessMock, subprocessMock):
+        """
+        If a step has no dependencies but a startAfter values is passed to
+        schedule, it must have the expected SP_DEPENDENCY_ARG value set
+        in its environment.
+        """
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name',
+                        'script': 'script',
+                    },
+                ],
+            })
+        sp.schedule(startAfter=[35, 36])
+
+        # Check that the dependency environment variable is correct.
+        env = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('--dependency=afterany:35,afterany:36',
+                         env['SP_DEPENDENCY_ARG'])
+
+    @patch('subprocess.check_output')
     @patch('os.path.abspath')
     @patch('os.access')
     @patch('os.path.exists')
@@ -938,6 +1068,55 @@ class TestSlurmPipeline(TestCase):
         self.assertEqual('1', env3['SP_SIMULATE'])
 
     @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testFirstStepAndNoLastStep(self, existsMock, accessMock,
+                                   subprocessMock):
+        """
+        If firstStep is specified and lastStep is not, the correct SP_SIMULATE
+        value must be set correctly in the environment.
+        """
+        subprocessMock.return_value = ''
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                    {
+                        'name': 'name3',
+                        'script': 'script3',
+                    },
+                ],
+            })
+        sp.schedule(firstStep='name2')
+
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script2'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+            call(['script3'], cwd='.', universal_newlines=True, stdin=DEVNULL,
+                 env=ANY),
+        ])
+
+        # Check that the SP_SIMULATE environment variable is correct in
+        # all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('1', env1['SP_SIMULATE'])
+
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('0', env2['SP_SIMULATE'])
+
+        env3 = subprocessMock.mock_calls[2][2]['env']
+        self.assertEqual('0', env3['SP_SIMULATE'])
+
+    @patch('subprocess.check_output')
     @patch('time.sleep')
     @patch('os.access')
     @patch('os.path.exists')
@@ -1176,8 +1355,9 @@ class TestSlurmPipeline(TestCase):
         """
         It must be possible to convert a scheduled specification to JSON.
         """
-        subprocessMock.return_value = 'output'
+        subprocessMock.return_value = 'TASK: xxx 123\n'
         timeMock.return_value = 10.0
+        self.maxDiff = None
 
         sp = SlurmPipeline(
             {
@@ -1187,6 +1367,7 @@ class TestSlurmPipeline(TestCase):
                         'script': 'script1',
                     },
                     {
+                        'dependencies': ['name1'],
                         'name': 'name2',
                         'script': 'script2',
                     },
@@ -1201,6 +1382,7 @@ class TestSlurmPipeline(TestCase):
                 'scheduledAt': 10.0,
                 'scriptArgs': None,
                 'skip': [],
+                'startAfter': None,
                 'steps': [
                     {
                         'name': 'name1',
@@ -1208,19 +1390,32 @@ class TestSlurmPipeline(TestCase):
                         'script': 'script1',
                         'simulate': True,
                         'skip': False,
-                        'stdout': 'output',
+                        'stdout': 'TASK: xxx 123\n',
                         'taskDependencies': {},
-                        'tasks': {},
+                        "tasks": {
+                            "xxx": [
+                                123,
+                            ],
+                        },
                     },
                     {
+                        'dependencies': ['name1'],
                         'name': 'name2',
                         'scheduledAt': 10.0,
                         'script': 'script2',
                         'simulate': False,
                         'skip': False,
-                        'stdout': 'output',
-                        'taskDependencies': {},
-                        'tasks': {},
+                        'stdout': 'TASK: xxx 123\n',
+                        "taskDependencies": {
+                            "xxx": [
+                                123,
+                            ],
+                        },
+                        "tasks": {
+                            "xxx": [
+                                123,
+                            ],
+                        },
                     },
                 ],
             },

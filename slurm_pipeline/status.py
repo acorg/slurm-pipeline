@@ -42,6 +42,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         """
         Get the job ids emitted by the final steps of a specification.
 
+        @param specification: A C{dict} containing an execution specification.
         @return: A C{set} of C{int} job ids.
         """
         steps = specification['steps']
@@ -49,6 +50,23 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         for stepName in self.finalSteps(specification):
             for jobIds in steps[stepName]['tasks'].values():
                 result.update(jobIds)
+        return result
+
+    def unfinishedJobs(self, specification, squeueArgs=None):
+        """
+        Get the ids of unfinished jobs emitted by a specification.
+
+        @param specification: A C{dict} containing an execution specification.
+        @param squeueArgs: A C{list} of C{str} arguments to pass to squeue
+            (including the 'squeue' command itself). If C{None}, the user's
+            login name will be appended to squeue -u.
+        @return: A C{set} of C{int} unifinished job ids.
+        """
+        squeue = SQueue(squeueArgs)
+        result = set()
+        for stepName in specification['steps']:
+            jobIds, jobIdsFinished = self.stepJobIdSummary(stepName, squeue)
+            result.update(jobIds - jobIdsFinished)
         return result
 
     def stepDependentJobIdSummary(self, stepName, squeue):
@@ -132,6 +150,12 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         else:
             append('  Skip: <None>')
 
+        if specification['startAfter']:
+            append('  Start after: %s' % ', '.join(
+                specification['startAfter']))
+        else:
+            append('  Start after: <None>')
+
         squeue = SQueue(squeueArgs)
         steps = specification['steps']
 
@@ -155,7 +179,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             else:
                 stepSummary.append('  %s: no jobs emitted' % stepName)
 
-        percent = (0.0 if totalJobIdsEmitted == 0 else
+        percent = (100.0 if totalJobIdsEmitted == 0 else
                    totalJobIdsFinished / totalJobIdsEmitted * 100.0)
 
         append('%d job%s emitted in total, of which %d (%.2f%%) are finished' %
@@ -202,7 +226,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
                         (jobIdCount, '' if jobIdCount == 1 else 's',
                          '' if dependencyCount else 's',
                          jobIdCompletedCount,
-                         0.0 if jobIdCount == 0 else
+                         100.0 if jobIdCount == 0 else
                          (jobIdCompletedCount / jobIdCount * 100.0)))
                 elif taskDependencyCount:
                     append('    0 jobs started by the dependent task%s' % (
@@ -241,7 +265,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
                         (jobIdCount, '' if jobIdCount == 1 else 's',
                          'this task' if taskCount else 'these tasks',
                          jobIdCompletedCount,
-                         0.0 if jobIdCount == 0 else
+                         100.0 if jobIdCount == 0 else
                          jobIdCompletedCount / jobIdCount * 100.0))
                 else:
                     append('    0 jobs started by %s' %

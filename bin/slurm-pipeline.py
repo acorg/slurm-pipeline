@@ -27,7 +27,7 @@ parser.add_argument(
           'pre-existing results files.'))
 
 parser.add_argument(
-    '--firstStep', metavar='step-name', default=None,
+    '--firstStep', metavar='step-name',
     help=('The name of the first specification step to execute. Earlier '
           'steps will actually be executed but they will have SP_SIMULATE=1 '
           'in their environment, allowing them to skip doing actual work '
@@ -35,13 +35,13 @@ parser.add_argument(
           'later steps receive the correct tasks to operate on).'))
 
 parser.add_argument(
-    '--lastStep', metavar='step-name', default=None,
+    '--lastStep', metavar='step-name',
     help=('The name of the last specification step to execute. See the '
           'help text for --first-step for how this affects the environment '
           'in which step scripts are executed.'))
 
 parser.add_argument(
-    '--skip', metavar='step-name', default=None, action='append',
+    '--skip', metavar='step-name', action='append',
     help='Name a step that should be skipped. May be repeated.')
 
 parser.add_argument(
@@ -52,12 +52,22 @@ parser.add_argument(
           'scheduled can be seen when used as dependencies in later '
           'invocations of sbatch.'))
 
+parser.add_argument(
+    '--startAfter', nargs='*',
+    help=('Give a list of SLURM job ids that must complete (in any state - '
+          'either successfully or in error) before the initial step(s), '
+          'i.e., those with no dependencies, in the current specification may '
+          'begin.'))
+
 args, scriptArgs = parser.parse_known_args()
 
 sp = SlurmPipeline(args.specification, status=False)
 
-status = sp.schedule(force=args.force, firstStep=args.firstStep,
-                     lastStep=args.lastStep, sleep=args.sleep,
-                     scriptArgs=scriptArgs, skip=args.skip)
+startAfter = list(map(int, args.startAfter)) if args.startAfter else None
+
+status = sp.schedule(
+    force=args.force, firstStep=args.firstStep, lastStep=args.lastStep,
+    sleep=args.sleep, scriptArgs=scriptArgs, skip=args.skip,
+    startAfter=startAfter)
 
 print(sp.specificationToJSON(status))

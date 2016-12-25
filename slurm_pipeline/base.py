@@ -79,6 +79,12 @@ class SlurmPipelineBase(object):
                     'The name %r of step %d was already used in '
                     'an earlier step' % (stepName, count))
 
+            if 'collect' in step and not step.get('dependencies', None):
+                raise SpecificationError(
+                    "Step %d (%r) is a 'collect' step but does not have any "
+                    "dependencies" %
+                    (count, stepName))
+
             stepNames.add(stepName)
 
             if 'dependencies' in step:
@@ -106,20 +112,6 @@ class SlurmPipelineBase(object):
                     raise SpecificationError(
                         'Step %d (%r) is an error step but has no '
                         "'dependencies' key" % (count, stepName))
-
-    @staticmethod
-    def _convertStepsToDict(specification):
-        """
-        Change the 'steps' key in a specification into an ordered dict.
-        keyed by specification step name, with values that are
-        specification step dicts. This gives more convenient direct
-        access to steps by name. The original JSON specification file has the
-        steps in a list because order is important.
-
-        @param specification: A C{dict} containing an execution specification.
-        """
-        specification['steps'] = OrderedDict(
-            (step['name'], step) for step in specification['steps'])
 
     @staticmethod
     def _loadSpecification(specificationFile):
