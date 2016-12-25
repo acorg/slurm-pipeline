@@ -1,6 +1,8 @@
 .PHONY: run, sh, clean
 
 run:
+	@test -e output || mkdir output
+	rm -f output/*
 	../../bin/slurm-pipeline.py -s specification.json texts/*.txt > output/specification-post-run.json
 
 sh:

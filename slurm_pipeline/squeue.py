@@ -14,7 +14,11 @@ class SQueue(object):
     """
     def __init__(self, squeueArgs=None):
         args = squeueArgs or ['squeue', '-u', getlogin()]
-        out = subprocess.check_output(args, universal_newlines=True)
+        try:
+            out = subprocess.check_output(args, universal_newlines=True)
+        except OSError as e:
+            raise SQueueError("Encountered OSError (%s) when running '%s'" %
+                              (e, ' '.join(args)))
 
         columnInfo = {
             'JOBID': {

@@ -16,6 +16,18 @@ class TestSQueue(TestCase):
     Tests for the slurm_pipeline.squeue.SQueue class.
     """
     @patch('subprocess.check_output')
+    def testSQueueNotFound(self, subprocessMock):
+        """
+        When an attempt to run squeue fails due to an OSError, an SQueueError
+        must be raised.
+        """
+        subprocessMock.side_effect = OSError('No such file or directory')
+        error = (
+            "^Encountered OSError \(No such file or directory\) when running "
+            "'squeue -u %s'$" % getlogin())
+        assertRaisesRegex(self, SQueueError, error,  SQueue)
+
+    @patch('subprocess.check_output')
     def testAllColumnsMissing(self, subprocessMock):
         """
         When the squeue output does not contain any of the right column

@@ -11,24 +11,24 @@ Runs under Python 2.7, 3.5, and [pypy](http://pypy.org/).
 The `bin` directory of this repo contains two Python scripts:
 
 * `slurm-pipeline.py` schedules programs to be run in an organized pipeline
-  fashion on a Linux cluster that uses SLURM as a workload manager. Here
-  "pipeline" means with an understanding of possibly complex inter-program
-  dependencies. `slurm-pipeline.py` must be given a JSON job specification
-  (see below). It prints a corresponding JSON status that contains the
-  original specification plus information about the scheduling (times, job
-  ids, etc).
+  fashion on a Linux cluster that uses SLURM as a workload manager.
+  `slurm-pipeline.py` must be given a JSON pipeline specification (see
+  below). It prints a corresponding JSON status that contains the original
+  specification plus information about the scheduling (times, job ids,
+  etc). By *pipeline*, I mean a collection of programs that are run in
+  order, taking into account (possibly complex) inter-program dependencies.
 * `slurm-pipeline-status.py` must be given a specification status (as
   produced by `slurm-pipeline.py`) and prints a summary of the status
   including job status (obtained from `squeue`). It can also be used to
-  print a list of unfinished jobs (useful for cancelling the jobs of a
-  running specification) or a list of the final jobs of a specification
-  (useful for making sure that jobs scheduled in a subsequent run of
-  `slurm-pipeline.py` do not begin until the given specification has
+  print a list of unfinished jobs (useful for canceling the jobs of a
+  running specification) or a list of the final jobs of a scheduled
+  pipeline (useful for making sure that jobs scheduled in a subsequent run
+  of `slurm-pipeline.py` do not begin until the given pipeline has
   finished). See below for more information.
 
 ## Specification
 
-A pipeline run is schedule according to a specification file in JSON format
+A run is schedule according to a pipeline specification file in JSON format
 which is given to `slurm-pipeline.py`. Several examples of these can be
 found under [`examples`](examples). Here's the one from
 [`examples/word-count/specification.json`](examples/word-count/specification.json):
@@ -56,14 +56,15 @@ found under [`examples`](examples). Here's the one from
 ```
 
 The specification above contains almost everything you need to know to set
-up your own pipeline, though you of course still have to write the scripts.
+up your own pipeline. You still have to write the scripts though, of
+course.
 
 ## Steps
 
 A pipeline run is organized into a series of conceptual *steps*. These are
-scheduled in the order they appear in the specification file. The actual
-running of the programs involved will occur later, in an order that will
-depend on how long earlier programs take to complete and on dependencies.
+run in the order they appear in the specification file. Step scripts will
+typically use the SLURM [`sbatch`](https://slurm.schedmd.com/sbatch.html)
+command to schedule the later execution of other programs.
 
 Each step must contain a `name` key. Names must be unique.
 
@@ -145,7 +146,7 @@ the `word-count` example below for sample output.
 
 `slurm-pipeline.py` accepts the following options:
 
-* `--specification filename`: as described above.
+* `--specification filename`: as described above. Required.
 * `--force`: Will cause `SP_FORCE` to be set in the environment of step
   scripts with a value of `1`. It is up to the individual scripts to notice
   this and act accordingly. If `--force` is not used, `SP_FORCE` will be
@@ -182,7 +183,17 @@ the `word-count` example below for sample output.
 
 Note that all script steps are *always* executed, including when
 `--firstStep` or `--skip` are used. It is up to the scripts to decide what
-to do.
+to do (based on the `SP_*` environment variables) in those cases.
+
+`slurm-pipeline.py` prints an updated specification to `stdout`. You will
+probably always want to save this to a file so you can later pass it to
+`slurm-pipeline-status.py`. If you forget to redirect `stdout`, information
+about the progress of the scheduled pipeline can be very difficult to
+recover (you may have many other jobs already scheduled, so it can be very
+hard to know which jobs were started by which run of `slurm-pipeline.py` or
+by any other method).  So if `stdout` is a terminal, `slurm-pipeline.py`
+tries to help by writing the status specification to a temporary file (as
+well as `stdout`) and prints its location (to `stderr`).
 
 ### Simulating versus skipping
 
@@ -261,9 +272,9 @@ exectued:
   not. The entire pipeline might be simulated, in which case there is no
   issue if intermediate results are never computed.
 * `SP_DEPENDENCY_ARG` contains a string that must be used when the script
-  invokes [`sbatch`](https://slurm.schedmd.com/sbatch.html) to guarantee
-  that the execution of the script does not begin until after the tasks
-  from all dependent steps have finished successfully.
+  invokes `sbatch` to guarantee that the execution of the script does not
+  begin until after the tasks from all dependent steps have finished
+  successfully.
 
     The canonical way to use `SP_DEPENDENCY_ARG` in a step script is as
     follows:
@@ -307,13 +318,13 @@ look like they are submitting jobs to `sbatch`).
 
 `slurm-pipeline-status.py` accepts the following options:
 
-* `--specification filename`: must contain the status specification printed
-    by `slurm-pipeline.py`.
+* `--specification filename`: must contain a status specification, as
+    printed by `slurm-pipeline.py`. Required.
 * `--squeueArgs'`: A list of arguments to pass to squeue (this must include
-    the squeue command itself). If not specified, the user's login name will be
-    appended to `squeue -u`.
-* `--printUnfinished`: If specified, just print a list of job ids that have not
-    yet finished. This can be used to cancel a job, via e.g.,
+    the squeue command itself). If not specified, the user's login name
+    will be appended to `squeue -u`.
+* `--printUnfinished`: If specified, just print a list of job ids that have
+    not yet finished. This can be used to cancel a job, via e.g.,
     
     ```sh
     $ slurm-pipeline-status.py --specification spec.json --printUnfinished  | xargs -r scancel
@@ -328,13 +339,17 @@ look like they are submitting jobs to `sbatch`).
     # Start a first specification and save its status:
     $ slurm-pipeline.py --specification spec1.json > spec1-status.json
 
-    # Start a second specification once the first has finished (this assumes you shell is bash):
-    $ slurm-pipeline.py --specification spec2.json --startAfter $(slurm-pipeline-status.py --specification spec1-status.json --printFinal) > spec2-status.json
+    # Start a second specification once the first has finished (this assumes your shell is bash):
+    $ slurm-pipeline.py --specification spec2.json \
+        --startAfter $(slurm-pipeline-status.py --specification spec1-status.json --printFinal) \
+        > spec2-status.json
     ```
 
 If neither `--printUnfinished` nor `--printFinal` is given,
 `slurm-pipeline-status.py` prints a detailed summary of the status of the
-specification it is given. Example output might resemble the following:
+specification it is given.  This will include the current status (obtained
+from [`squeue`](https://slurm.schedmd.com/squeue.html)) of all jobs
+launched.  Example output will resemble the following:
 
 ```sh
 $ slurm-pipeline.py --specification spec1.json > status.json
@@ -492,23 +507,35 @@ status:
 
 ```json
 {
-  "scheduledAt": 1477302666.246372,
+  "firstStep": null,
+  "force": false,
+  "lastStep": null,
+  "scheduledAt": 1482709202.618517,
+  "scriptArgs": [
+    "texts/1-karamazov.txt",
+    "texts/2-trial.txt",
+    "texts/3-ulysses.txt"
+  ],
+  "skip": [],
+  "startAfter": null,
   "steps": [
     {
       "name": "one-per-line",
-      "scheduledAt": 1477302666.271217,
+      "scheduledAt": 1482709202.65294,
       "script": "scripts/one-word-per-line.sh",
-      "stdout": "TASK: 1-karamazov 20132\nTASK: 2-trial 3894\nTASK: 3-ulysses 13586\n",
+      "simulate": false,
+      "skip": false,
+      "stdout": "TASK: 1-karamazov 22480\nTASK: 2-trial 26912\nTASK: 3-ulysses 25487\n",
       "taskDependencies": {},
       "tasks": {
         "1-karamazov": [
-          20132
+          22480
         ],
         "2-trial": [
-          3894
+          26912
         ],
         "3-ulysses": [
-          13586
+          25487
         ]
       }
     },
@@ -517,29 +544,31 @@ status:
         "one-per-line"
       ],
       "name": "long-words",
-      "scheduledAt": 1477302666.300458,
+      "scheduledAt": 1482709202.68266,
       "script": "scripts/long-words-only.sh",
-      "stdout": "TASK: 3-ulysses 31944\n",
+      "simulate": false,
+      "skip": false,
+      "stdout": "TASK: 3-ulysses 1524\n",
       "taskDependencies": {
         "1-karamazov": [
-          20132
+          22480
         ],
         "2-trial": [
-          3894
+          26912
         ],
         "3-ulysses": [
-          13586
+          25487
         ]
       },
       "tasks": {
         "1-karamazov": [
-          27401
+          29749
         ],
         "2-trial": [
-          13288
+          15636
         ],
         "3-ulysses": [
-          31944
+          1524
         ]
       }
     },
@@ -549,18 +578,20 @@ status:
         "long-words"
       ],
       "name": "summarize",
-      "scheduledAt": 1477302666.319238,
+      "scheduledAt": 1482709202.7016,
       "script": "scripts/summarize.sh",
+      "simulate": false,
+      "skip": false,
       "stdout": "",
       "taskDependencies": {
         "1-karamazov": [
-          27401
+          29749
         ],
         "2-trial": [
-          13288
+          15636
         ],
         "3-ulysses": [
-          31944
+          1524
         ]
       },
       "tasks": {}
@@ -701,7 +732,10 @@ tasks. For example, you might have a very large input file that you want to
 process in smaller pieces. You can use `split` to break the file into
 pieces and emit task names such as `xaa`, `xab` etc, but you must do this
 synchronously (i.e., in the step script, not in a script submitted to
-`sbatch` by the step script to be executed some time later).
+`sbatch` by the step script to be executed some time later). This is an
+example of when you would not emit a job id for a task, seeing as no
+further processing is needed to complete the tasks (i.e., the `split` has
+already run) and the next step in the pipeline can be run immediately.
 
 In such cases, it may be advisable to allocate a compute node (using
 [`salloc`](https://slurm.schedmd.com/salloc.html)) to run
