@@ -1,4 +1,7 @@
-#!/bin/bash
+#!/bin/bash -e
+
+rm -fr output
+mkdir output
 
 out=output/one-word-per-line.out
 

@@ -1,12 +1,27 @@
 # slurm-pipeline
 
-A Python class for scheduling [SLURM](http://slurm.schedmd.com/)
+A Python class for scheduling and examining
+[SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
-This repo contains a Python script, `bin/slurm-pipeline.py` that can
-schedule programs to be run in an organized pipeline fashion on a Linux
-cluster that uses SLURM as a workload manager. Here "pipeline" means with
-an understanding of possibly complex inter-program dependencies.
+The `bin` directory of this repo contains two Python scripts:
+
+* `slurm-pipeline.py` schedules programs to be run in an organized
+  pipeline fashion on a Linux cluster that uses SLURM as a workload
+  manager. Here "pipeline" means with an understanding of possibly complex
+  inter-program dependencies. This command prints a (JSON) status that is the
+  original specification plus information about the scheduling (times, job
+  ids, etc).
+* `slurm-pipeline-status.py` is given a specification status (as
+  produced by `slurm-pipeline.py`) and prints a summary of the status,
+  including job status (obtained from `squeue`). It can also be used to
+  just print a list of unfinished jobs (which is useful for cancelling a
+  specification) or a list of the final jobs from a speicification (which
+  is useful for making sure that jobs scheduled by a subsequent run of
+  `slurm-pipeline.py` do not begin until the given specification has
+  finished). See below for more information.
+
+## Specification
 
 A pipeline run is schedule according to a specification file in JSON
 format. A couple of these can be seen in the `examples` directory of the
@@ -151,6 +166,14 @@ plans for using the updated specification).
   error. This argument may be repeated to skip multiple steps. See also the
   `skip` directive that can be used in a specification file for more
   permanent disabling of a script step.
+* `--startAfter`: Specify one or more SLURM job ids that must be allowed to
+  complete (in any state - successful or in error) before the initial steps
+  of the current specification are allowed to run. If you have saved the
+  output of a previous `slurm-pipeline.py` run, you can use
+  `slurm-pipeline-status.py` to output the final job ids of that previous
+  run and give those job ids to a subsequent invocation of
+  `slurm-pipeline.py` (see `slurm-pipeline-status.py` below for an
+  example).
 
 Note that all script steps are *always* executed, including when
 `--firstStep` or `--skip` are used. It is up to the scripts to decide what
@@ -274,6 +297,141 @@ installed on a machine by running the examples in the `examples` directory.
 The scripts in the examples all do their work synchronously (they emit fake
 SLURM job ids using the Bash shell's `RANDOM` variable, just to make it
 look like they are submitting jobs to `sbatch`).
+
+## slurm-pipeline-status.py options
+
+`slurm-pipeline-status.py` accepts the following options:
+
+* `--specification filename`: must contain the status specification printed
+    by `slurm-pipeline.py`.
+* `--squeueArgs'`: A list of arguments to pass to squeue (this must include
+    the squeue command itself). If not specified, the user's login name will be
+    appended to `squeue -u`.
+* `--printUnfinished`: If specified, just print a list of job ids that have not
+    yet finished. This can be used to cancel a job, via e.g.,
+    
+    ```sh
+    $ slurm-pipeline-status.py --specification spec.json --printUnfinished  | xargs -r scancel
+    ```
+* `--printFinal`: If specified, just print a list of job ids issued by the
+    final steps of a specification. This can be used with the
+    `--startAfter` option to `slurm-pipeline.py` to make it schedule a
+    different specification to run only after the given specification
+    finishes. E.g.,
+    
+    ```sh
+    # Start a first specification and save its status:
+    $ slurm-pipeline.py --specification spec1.json > spec1-status.json
+
+    # Start a second specification once the first has finished (this assumes you shell is bash):
+    $ slurm-pipeline.py --specification spec2.json --startAfter $(slurm-pipeline-status.py --specification spec1-status.json --printFinal) > spec2-status.json
+    ```
+
+If neither `--printUnfinished` nor `--printFinal` is given,
+`slurm-pipeline-status.py` prints a detailed summary of the status of the
+specification it is given. Example output might resemble the following:
+
+```sh
+$ slurm-pipeline.py --specification spec1.json > status.json
+$ slurm-pipeline-status.py --specification status.json
+Scheduled at: 2016-12-10 14:20:58
+Scheduling arguments:
+  First step: panel
+  Force: False
+  Last step: None
+  Script arguments: <None>
+  Skip: <None>
+  Start after: <None>
+5 jobs emitted in total, of which 4 (80.00%) are finished
+Step summary:
+  start: no jobs emitted
+  split: no jobs emitted
+  blastn: 3 jobs emitted, 3 (100.00%) finished
+  panel: 1 job emitted, 1 (100.00%) finished
+  stop: 1 job emitted, 0 (0.00%) finished
+Step 1: start
+  No dependencies.
+  No tasks emitted by this step
+  Working directory: 00-start
+  Scheduled at: 2016-12-10 14:20:59
+  Script: 00-start/start.sh
+  Simulate: True
+  Skip: False
+Step 2: split
+  1 step dependency: start
+    Dependent on 0 tasks emitted by the dependent step
+  3 tasks emitted by this step
+    0 jobs started by these tasks
+    Tasks:
+      chunk-aaaaa
+      chunk-aaaab
+      chunk-aaaac
+  Working directory: 01-split
+  Scheduled at: 2016-12-10 14:21:04
+  Script: 01-split/sbatch.sh
+  Simulate: True
+  Skip: False
+Step 3: blastn
+  1 step dependency: split
+    Dependent on 3 tasks emitted by the dependent step
+    0 jobs started by the dependent tasks
+    Dependent tasks:
+      chunk-aaaaa
+      chunk-aaaab
+      chunk-aaaac
+  3 tasks emitted by this step
+    3 jobs started by this task, of which 3 (100.00%) are finished
+    Tasks:
+      chunk-aaaaa
+        Job 4416231: Finished
+      chunk-aaaab
+        Job 4416232: Finished
+      chunk-aaaac
+        Job 4416233: Finished
+  Working directory: 02-blastn
+  Scheduled at: 2016-12-10 14:22:02
+  Script: 02-blastn/sbatch.sh
+  Simulate: True
+  Skip: False
+Step 4: panel
+  1 step dependency: blastn
+    Dependent on 3 tasks emitted by the dependent step
+    3 jobs started by the dependent task, of which 3 (100.00%) are finished
+    Dependent tasks:
+      chunk-aaaaa
+        Job 4416231: Finished
+      chunk-aaaab
+        Job 4416232: Finished
+      chunk-aaaac
+        Job 4416233: Finished
+  1 task emitted by this step
+    1 job started by this task, of which 1 (100.00%) are finished
+    Tasks:
+      panel
+        Job 4417615: Finished
+  Working directory: 03-panel
+  Scheduled at: 2016-12-10 14:22:02
+  Script: 03-panel/sbatch.sh
+  Simulate: False
+  Skip: False
+Step 5: stop
+  1 step dependency: panel
+    Dependent on 1 task emitted by the dependent step
+    1 job started by the dependent task, of which 1 (100.00%) are finished
+    Dependent tasks:
+      panel
+        Job 4417615: Finished
+  1 task emitted by this step
+    1 job started by this task, of which 0 (0.00%) are finished
+    Tasks:
+      stop
+        Job 4417616: Status=R Time=4:27 Nodelist=cpu-3
+  Working directory: 04-stop
+  Scheduled at: 2016-12-10 14:22:02
+  Script: 04-stop/sbatch.sh
+  Simulate: False
+  Skip: False
+```
 
 ## Examples
 

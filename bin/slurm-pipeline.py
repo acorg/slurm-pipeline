@@ -7,7 +7,12 @@ ids. The status can be saved to a file and later given to
 slurm-pipeline-status.py to monitor job progress.
 """
 
+from __future__ import print_function
+
+import sys
+import os
 import argparse
+from tempfile import mkstemp
 
 from slurm_pipeline import SlurmPipeline
 
@@ -61,7 +66,7 @@ parser.add_argument(
 
 args, scriptArgs = parser.parse_known_args()
 
-sp = SlurmPipeline(args.specification, status=False)
+sp = SlurmPipeline(args.specification)
 
 startAfter = list(map(int, args.startAfter)) if args.startAfter else None
 
@@ -70,4 +75,18 @@ status = sp.schedule(
     sleep=args.sleep, scriptArgs=scriptArgs, skip=args.skip,
     startAfter=startAfter)
 
-print(sp.specificationToJSON(status))
+statusAsJSON = sp.specificationToJSON(status)
+
+print(statusAsJSON)
+
+# If the user forgot to redirect output to a file, save it to a tempfile
+# for them and let them know where it is. We do this because without the
+# status they will have no way to examine the job with
+# slurm-pipeline-status.py
+if os.isatty(1):
+    fd, filename = mkstemp(prefix='slurm-pipeline-status-', suffix='.json')
+    print('WARNING: You did not save stdout to a file, so I have '
+          'saved the specification status to %r for you.' % filename,
+          file=sys.stderr)
+    os.write(fd, statusAsJSON)
+    os.write(fd, '\n')

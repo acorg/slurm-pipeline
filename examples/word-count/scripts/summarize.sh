@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 out=output/summarize.out
 
