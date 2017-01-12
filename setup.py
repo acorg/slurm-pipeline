@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='slurm-pipeline',
-      version='1.1.0',
+      version='1.1.1',
       packages=['slurm_pipeline'],
       include_package_data=True,
       url='https://github.com/acorg/slurm-pipeline',
@@ -11,7 +11,7 @@ setup(name='slurm-pipeline',
       author='Terry Jones',
       author_email='tcj25@cam.ac.uk',
       keywords=['slurm'],
-      scripts=['bin/slurm-pipeline.py'],
+      scripts=['bin/slurm-pipeline.py', 'bin/slurm-pipeline-status.py'],
       classifiers=[
           'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3',
