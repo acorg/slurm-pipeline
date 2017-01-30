@@ -38,21 +38,21 @@ class SlurmPipelineStatus(SlurmPipelineBase):
 
         SlurmPipelineBase.checkSpecification(specification)
 
-    def finalJobs(self, specification):
+    def finalJobs(self):
         """
         Get the job ids emitted by the final steps of a specification.
 
         @param specification: A C{dict} containing an execution specification.
         @return: A C{set} of C{int} job ids.
         """
-        steps = specification['steps']
+        steps = self.specification['steps']
         result = set()
-        for stepName in self.finalSteps(specification):
+        for stepName in steps:
             for jobIds in steps[stepName]['tasks'].values():
                 result.update(jobIds)
         return result
 
-    def unfinishedJobs(self, specification, squeueArgs=None):
+    def unfinishedJobs(self, squeueArgs=None):
         """
         Get the ids of unfinished jobs emitted by a specification.
 
@@ -64,7 +64,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         """
         squeue = SQueue(squeueArgs)
         result = set()
-        for stepName in specification['steps']:
+        for stepName in self.specification['steps']:
             jobIds, jobIdsFinished = self.stepJobIdSummary(stepName, squeue)
             result.update(jobIds - jobIdsFinished)
         return result

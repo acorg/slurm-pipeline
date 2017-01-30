@@ -50,6 +50,6 @@ status = SlurmPipelineStatus(args.specification)
 if args.printFinal:
     print('\n'.join(map(str, status.finalJobs())))
 elif args.printUnfinished:
-    print('\n'.join(map(str, status.unfinishedJobs(args.squeueArgs))))
+    print('\n'.join(map(str, status.unfinishedJobs(squeueArgs=args.squeueArgs))))
 else:
     print(status.toStr(args.squeueArgs))
