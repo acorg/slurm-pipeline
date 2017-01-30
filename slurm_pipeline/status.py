@@ -5,7 +5,7 @@ from time import gmtime, strftime
 from .base import SlurmPipelineBase
 from .error import SpecificationError
 from .squeue import SQueue
-
+from .sacct import SAcct
 
 def secondsToTime(seconds):
     """
@@ -158,7 +158,9 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         else:
             append('  Start after: <None>')
 
+        sacct = SAcct()
         squeue = SQueue(squeueArgs)
+
         steps = specification['steps']
 
         stepSummary = ['Step summary:']
@@ -285,9 +287,17 @@ class SlurmPipelineStatus(SlurmPipelineBase):
                 assert len(step['tasks']) == 0
                 append('  No tasks emitted by this step')
 
+            try:
+                state = sacct.jobs[jobId]['state'] if not step['simulate'] else 'SIMULATE'
+            except KeyError as e:
+                print e
+                state = "UNKNOWN"
+
             result.extend([
-                '  Working directory: %s' % step['cwd'],
+                '  Working directory: %s' % step.get('cwd', '.'),
                 '  Scheduled at: %s' % secondsToTime(step['scheduledAt']),
+                '  State: %s' % state,
+                '  Elapsed: %s' % sacct.jobs[jobId]['elapsed'],
                 '  Script: %s' % step['script'],
                 '  Simulate: %s' % step['simulate'],
                 '  Skip: %s' % step['skip'],

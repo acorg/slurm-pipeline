@@ -12,3 +12,7 @@ class SpecificationError(SlurmPipelineError):
 
 class SQueueError(SlurmPipelineError):
     'A problem was found in the output of squeue'
+
+
+class SAcctError(SlurmPipelineError):
+    'A problem was found in the output of sacct'
