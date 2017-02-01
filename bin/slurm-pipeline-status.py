@@ -37,6 +37,9 @@ parser.add_argument(
           '%s --printUnfinished -s status.json | xargs scancel' % sys.argv[0]))
 
 parser.add_argument(
+    '--printFinished', default=False, action='store_true')
+
+parser.add_argument(
     '--printFinal', default=False, action='store_true',
     help=('If specified, print a list of job ids issued by the final steps '
           'of a specification. This can be used with the --startAfter option '
@@ -51,5 +54,7 @@ if args.printFinal:
     print('\n'.join(map(str, status.finalJobs())))
 elif args.printUnfinished:
     print('\n'.join(map(str, status.unfinishedJobs(squeueArgs=args.squeueArgs))))
+elif args.printFinished:
+    print('\n'.join(map(str, status.finishedJobs())))
 else:
     print(status.toStr(args.squeueArgs))

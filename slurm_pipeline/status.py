@@ -52,6 +52,15 @@ class SlurmPipelineStatus(SlurmPipelineBase):
                 result.update(jobIds)
         return result
 
+    def finishedJobs(self):
+        sacct = SAcct()
+        result = set()
+        for step in self.specification['steps'].values():
+            tasks = step['tasks']
+            for taskName, jobIds in tasks.items():
+                result.update([jobid for jobid in jobIds if sacct.finished(jobid)])
+        return result
+
     def unfinishedJobs(self, squeueArgs=None):
         """
         Get the ids of unfinished jobs emitted by a specification.
