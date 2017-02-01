@@ -70,6 +70,11 @@ parser.add_argument(
           'priority) to 10000 (lowest priority). Note that only privileged '
           'users can specify a negative adjustment.'))
 
+parser.add_argument(
+    '--outputSpecification', '-o', default=None,
+    help=('The name of the file to which the pipeline status specification, '
+          'are written in JSON format.'))
+
 args, scriptArgs = parser.parse_known_args()
 
 sp = SlurmPipeline(args.specification)
@@ -83,13 +88,18 @@ status = sp.schedule(
 
 statusAsJSON = sp.specificationToJSON(status)
 
-print(statusAsJSON)
+if not args.outputSpecification:
+    print(statusAsJSON)
+else:
+    with open(args.outputSpecification, 'w') as output_specification:
+        output_specification.write(statusAsJSON)
+        output_specification.write('\n')
 
 # If the user forgot to redirect output to a file, save it to a tempfile
 # for them and let them know where it is. We do this because without the
 # status they will have no way to examine the job with
 # slurm-pipeline-status.py
-if os.isatty(1):
+if os.isatty(1) and not args.outputSpecification:
     fd, filename = mkstemp(prefix='slurm-pipeline-status-', suffix='.json')
     print('WARNING: You did not save stdout to a file, so I have '
           'saved the specification status to %r for you.' % filename,
