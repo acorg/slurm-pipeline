@@ -320,7 +320,7 @@ look like they are submitting jobs to `sbatch`).
 
 * `--specification filename`: must contain a status specification, as
     printed by `slurm-pipeline.py`. Required.
-* `--squeueArgs'`: A list of arguments to pass to squeue (this must include
+* `--squeueArgs`: A list of arguments to pass to squeue (this must include
     the squeue command itself). If not specified, the user's login name
     will be appended to `squeue -u`.
 * `--printUnfinished`: If specified, just print a list of job ids that have
