@@ -248,7 +248,7 @@ the full list:
 ## Step script environment variables
 
 The following environment variables are set when a step's script is
-exectued:
+executed:
 
 * `SP_ORIGINAL_ARGS` contains the (space-separated) list of arguments
   originally passed to `slurm-pipeline.py`. Most scripts will not need to
