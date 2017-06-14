@@ -443,6 +443,7 @@ class TestSlurmPipelineStatus(TestCase):
             'firstStep': 'panel',
             'force': False,
             'lastStep': None,
+            'nice': 3,
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
@@ -572,6 +573,7 @@ Scheduling arguments:
   First step: panel
   Force: False
   Last step: None
+  Nice: 3
   Script arguments: <None>
   Skip: <None>
   Start after: <None>
@@ -680,6 +682,7 @@ Step 5: stop
             'scriptArgs': ['hey', 'you'],
             'skip': ['skip', 'this'],
             'startAfter': ['34', '56'],
+            'nice': 'None',
             'steps': [
                 {
                     'cwd': '00-start',
@@ -708,6 +711,7 @@ Scheduling arguments:
   First step: None
   Force: False
   Last step: None
+  Nice: None
   Script arguments: hey you
   Skip: skip, this
   Start after: 34, 56

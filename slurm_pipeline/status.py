@@ -139,6 +139,8 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         ]
         append = result.append
 
+        append('  Nice: %s' % specification.get('nice', '<None>'))
+
         if specification['scriptArgs']:
             append('  Script arguments: %s' %
                    ' '.join(specification['scriptArgs']))
