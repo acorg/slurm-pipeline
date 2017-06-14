@@ -1,10 +1,16 @@
-.PHONY: check, tcheck, pep8, pyflakes, lint, wc, clean, clobber, upload
+.PHONY: check, tcheck, examples-test, pep8, pyflakes, lint, wc, clean, clobber, upload
 
 check:
 	python -m discover -v
 
 tcheck:
 	trial --rterrors test
+
+examples-test:
+	make -C examples/word-count run clean
+	make -C examples/word-count-with-skipping run clean
+	make -C examples/blast run clean
+	make -C examples/blast-with-force-and-simulate run clean
 
 pep8:
 	find . -path './.tox' -prune -o -path './build' -prune -o -path './dist' -prune -o -name '*.py' -print0 | xargs -0 pep8

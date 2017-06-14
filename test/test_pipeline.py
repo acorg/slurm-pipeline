@@ -874,6 +874,64 @@ class TestSlurmPipeline(TestCase):
     @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
+    def testDefaultNice(self, existsMock, accessMock, subprocessMock):
+        """
+        If no nice value is given to schedule, SP_NICE_ARG must be set to
+        '--nice' in the step execution environment.
+        """
+        subprocessMock.return_value = ''
+
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        sp.schedule()
+
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+        ])
+
+        env = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('--nice', env['SP_NICE_ARG'])
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testSpecificNice(self, existsMock, accessMock, subprocessMock):
+        """
+        If a specific nice value is given to schedule, SP_NICE_ARG must be set
+        to the expected value in the step execution environment.
+        """
+        subprocessMock.return_value = ''
+
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        sp.schedule(nice=40)
+
+        subprocessMock.assert_has_calls([
+            call(['script1'], cwd='.', universal_newlines=True,
+                 stdin=DEVNULL, env=ANY),
+        ])
+
+        env = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('--nice 40', env['SP_NICE_ARG'])
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
     def testFirstStepOnly(self, existsMock, accessMock, subprocessMock):
         """
         If firstStep (bot not lastStep) is specified for a SlurmPipeline the
@@ -1378,6 +1436,7 @@ class TestSlurmPipeline(TestCase):
             {
                 'firstStep': 'name2',
                 'lastStep': None,
+                'nice': None,
                 'force': True,
                 'scheduledAt': 10.0,
                 'scriptArgs': None,
@@ -1495,3 +1554,70 @@ class TestSlurmPipeline(TestCase):
         env3 = subprocessMock.mock_calls[2][2]['env']
         self.assertEqual('--dependency=afternotok:238?afternotok:560',
                          env3['SP_DEPENDENCY_ARG'])
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testStringNice(self, existsMock, accessMock, subprocessMock):
+        """
+        If a string nice value is passed to schedule, a SchedulingError
+        must be raised.
+        """
+        subprocessMock.return_value = 'TASK: xxx 123\n'
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        error = "^Nice \(priority\) value 'x' is not numeric$"
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule, nice='x')
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testNiceTooBig(self, existsMock, accessMock, subprocessMock):
+        """
+        If a nice value that is too big (> 10000) is passed to schedule, a
+        SchedulingError must be raised.
+        """
+        subprocessMock.return_value = 'TASK: xxx 123\n'
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        error = ("^Nice \(priority\) value 10001 is outside the allowed "
+                 "\[-10000, 10000\] range$")
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
+                          nice=10001)
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testNiceTooSmall(self, existsMock, accessMock, subprocessMock):
+        """
+        If a nice value that is too small (< -10000) is passed to schedule, a
+        SchedulingError must be raised.
+        """
+        subprocessMock.return_value = 'TASK: xxx 123\n'
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        error = ("^Nice \(priority\) value -10001 is outside the allowed "
+                 "\[-10000, 10000\] range$")
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
+                          nice=-10001)

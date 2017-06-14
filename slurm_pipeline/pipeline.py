@@ -26,6 +26,11 @@ class SlurmPipeline(SlurmPipelineBase):
     # job ids. The following regex just matches the first part of that.
     TASK_NAME_LINE = re.compile('^TASK:\s+(\S+)\s*')
 
+    # Limits on the --nice argument to sbatch. In later SLURM versions the
+    # limits are +/-2147483645. See https://slurm.schedmd.com/sbatch.html
+    NICE_HIGHEST = -10000
+    NICE_LOWEST = 10000
+
     @staticmethod
     def checkSpecification(specification):
         """
@@ -54,7 +59,7 @@ class SlurmPipeline(SlurmPipelineBase):
         SlurmPipelineBase.checkSpecification(specification)
 
     def schedule(self, force=False, firstStep=None, lastStep=None, sleep=0.0,
-                 scriptArgs=None, skip=None, startAfter=None):
+                 scriptArgs=None, skip=None, startAfter=None, nice=None):
         """
         Schedule the running of our execution specification.
 
@@ -86,8 +91,12 @@ class SlurmPipeline(SlurmPipelineBase):
             (either successully or unsuccessully, it doesn't matter) before
             steps in the current specification may start. If C{None}, steps in
             the current specification may start immediately.
+        @param nice: An C{int} nice (priority) value, in the range
+            self.NICE_HIGHEST to self.NICE_LOWEST. Note that only
+            privileged users can specify a negative adjustment.
         @raise SchedulingError: If there is a problem with the first, last, or
-            skipped steps, as determined by self._checkRuntime.
+            skipped steps, as determined by self._checkRuntime. ValueError if
+            C{nice} is not numeric or is out of its allowed range.
         @return: A specification C{dict}. This is a copy of the original
             specification, updated with information about this scheduling.
         """
@@ -97,11 +106,12 @@ class SlurmPipeline(SlurmPipelineBase):
         if nSteps and lastStep is not None and firstStep is None:
             firstStep = list(specification['steps'])[0]
         skip = set(skip or ())
-        self._checkRuntime(steps, firstStep, lastStep, skip)
+        self._checkRuntime(steps, firstStep, lastStep, skip, nice)
         specification.update({
             'force': force,
             'firstStep': firstStep,
             'lastStep': lastStep,
+            'nice': nice,
             'scheduledAt': time.time(),
             'scriptArgs': scriptArgs,
             'skip': skip,
@@ -110,6 +120,8 @@ class SlurmPipeline(SlurmPipelineBase):
         })
 
         environ['SP_FORCE'] = str(int(force))
+        environ['SP_NICE_ARG'] = (
+            '--nice' if nice is None else '--nice %d' % nice)
         firstStepFound = lastStepFound = False
 
         for stepIndex, stepName in enumerate(steps):
@@ -297,8 +309,8 @@ class SlurmPipeline(SlurmPipelineBase):
                         (taskName, jobIds, script, step['name']))
                 tasks[taskName].update(jobIds)
 
-    @staticmethod
-    def _checkRuntime(steps, firstStep=None, lastStep=None, skip=None):
+    def _checkRuntime(self, steps, firstStep=None, lastStep=None, skip=None,
+                      nice=None):
         """
         Check that a proposed scheduling makes sense.
 
@@ -309,9 +321,13 @@ class SlurmPipeline(SlurmPipelineBase):
         @param lastStep: If not C{None}, the name of the last specification
             step to execute.
         @param skip: A C{set} of C{str} step names that should be skipped.
+        @param nice: An C{int} nice (priority) value, in the range
+            self.NICE_HIGHEST to self.NICE_LOWEST. Note that only privileged
+            users can specify a negative adjustment.
         @raise SchedulingError: if the last step occurs before the first, if
-            the last or first step are unknown, or if asked to skip a
-            non-existent step.
+            the last or first step are unknown, if asked to skip a
+            non-existent step, or if C{nice} is not numeric or is out of its
+            allowed range (see above).
         @return: An C{OrderedDict} keyed by specification step name,
             with values that are step C{dict}s. This provides convenient /
             direct access to steps by name.
@@ -321,6 +337,23 @@ class SlurmPipeline(SlurmPipelineBase):
         if firstStep is not None and firstStep not in steps:
             raise SchedulingError(
                 'First step %r not found in specification' % firstStep)
+
+        if lastStep is not None and lastStep not in steps:
+            raise SchedulingError(
+                'Last step %r not found in specification' % lastStep)
+
+        if nice is not None:
+            try:
+                nice = int(nice)
+            except ValueError:
+                raise SchedulingError(
+                    'Nice (priority) value %r is not numeric' % nice)
+            else:
+                if nice < self.NICE_HIGHEST or nice > self.NICE_LOWEST:
+                    raise SchedulingError(
+                        'Nice (priority) value %r is outside the allowed '
+                        '[%d, %d] range' %
+                        (nice, self.NICE_HIGHEST, self.NICE_LOWEST))
 
         if lastStep is not None and lastStep not in steps:
             raise SchedulingError(
