@@ -64,6 +64,12 @@ parser.add_argument(
           'i.e., those with no dependencies, in the current specification may '
           'begin.'))
 
+parser.add_argument(
+    '--nice', type=int,
+    help=('A numeric nice (priority) value, in the range -10000 (highest '
+          'priority) to 10000 (lowest priority). Note that only privileged '
+          'users can specify a negative adjustment.'))
+
 args, scriptArgs = parser.parse_known_args()
 
 sp = SlurmPipeline(args.specification)
@@ -73,7 +79,7 @@ startAfter = list(map(int, args.startAfter)) if args.startAfter else None
 status = sp.schedule(
     force=args.force, firstStep=args.firstStep, lastStep=args.lastStep,
     sleep=args.sleep, scriptArgs=scriptArgs, skip=args.skip,
-    startAfter=startAfter)
+    startAfter=startAfter, nice=args.nice)
 
 statusAsJSON = sp.specificationToJSON(status)
 

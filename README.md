@@ -248,7 +248,7 @@ the full list:
 ## Step script environment variables
 
 The following environment variables are set when a step's script is
-exectued:
+executed:
 
 * `SP_ORIGINAL_ARGS` contains the (space-separated) list of arguments
   originally passed to `slurm-pipeline.py`. Most scripts will not need to
@@ -275,26 +275,42 @@ exectued:
   invokes `sbatch` to guarantee that the execution of the script does not
   begin until after the tasks from all dependent steps have finished
   successfully.
+* `SP_NICE_ARG` contains a string that should be put on the command line when
+  calling `sbatch`. This sets the priority level of the SLURM jobs. The numeric
+  nice value can be set using the `--nice` option when running `slurm-pipeline.py`.
+  See `man sbatch` for details on nice values. Note that calling `sbatch` with
+  this value is not enforced. The `--nice` option simply provides a simple way
+  to specify a priority value on the command line and to pass it to scripts.
+  Scripts can always ignore it or use their own value. If no value is given,
+  `SP_NICE_ARG` will contain just the string `--nice`, which will tell SLURM
+  to use a default nice value. It is useful to use a default nice value as it
+  allows a regular user to later submit jobs with a higher priority (lower nice
+  value). A regular user cannot use a negative nice value, so if a default
+  nice value was not used, all jobs get nice value `0` which prevents the user
+  from submitting higher priority jobs later on.
 
-    The canonical way to use `SP_DEPENDENCY_ARG` in a step script is as
-    follows:
+## Calling sbatch with SP_DEPENDENCY_ARG and SP_NICE_ARG
 
-    ```sh
-    jobid=`sbatch -n 1 $SP_DEPENDENCY_ARG submit.sh $task | cut -f4 -d' '`
-    echo "TASK: $task $jobid"
-    ```
+The canonical way to use `SP_DEPENDENCY_ARG` and `SP_NICE_ARG` when calling
+`sbatch` in a step shell script is as follows:
 
-    This calls `sbatch` with the dependency argument (if any) and
-    simultaneously gets the job id from the `sbatch` output (`sbatch` prints a
-    line like `Submitted batch job 3779695`) and the `cut` in the above pulls
-    out just the job id. The task name is then emitted, along with the job id.
+```sh
+jobid=`sbatch $SP_DEPENDENCY_ARG $SP_NICE_ARG script.sh | cut -f4 -d' '`
+echo "TASK: $task $jobid"
+```
+
+This calls `sbatch` with the dependency and nice arguments (if any) and
+gets the job id from the `sbatch` output (`sbatch` prints a line like
+`Submitted batch job 3779695`) and the `cut` in the above pulls out just
+the job id. The task name is then emitted, along with the job id.
+
 
 ## Separation of concerns
 
 `slurm-pipeline.py` doesn't interact with SLURM at all. Actually, the
-*only* thing it knows about SLURM is how to construct a dependency argument
-for `sbatch` (so it could in theory be generalized to support other
-workload managers).
+*only* things it knows about SLURM is how to construct dependency and nice
+arguments for `sbatch` (so it could in theory be generalized to support
+other workload managers).
 
 To use `slurm-pipeline.py` you need to make a specification file such as
 the one above to indicate the steps in your pipeline, their scripts, and
@@ -716,19 +732,20 @@ the `examples` directory.
 SLURM allows users to submit scripts for later execution. Thus there are
 two distinct phases of operation: the time of scheduling and the later
 time(s) of script excecution. When using `slurm-pipeline.py` it is
-important to understand this distinction.
+very important to keep this distinction in mind.
 
 The reason is that `slurm-pipeline.py` only examines the output of
-scheduling scripts for task names and job ids. If a scheduling script calls
-`sbatch` to execute a later script, the output of that later script cannot
-be checked for `TASK: xxx 97322` style output because `slurm-pipeline.py`
-is completely unaware of the existence of that script. Thus all tasks and
-job dependencies must be established at the time of scheduling.
+*scheduling* scripts for task names and job ids. If a scheduling script
+calls `sbatch` to execute a later script, the output of that later script
+(when it is finally run by SLURM) cannot be checked for `TASK: xxx 97322`
+style output because `slurm-pipeline.py` is completely unaware of the
+existence of that script. In other words, *all tasks and job dependencies
+must be established at the time of scheduling.*
 
 Normally this is not an issue, as many pipelines fall nicely into the model
 used by `slurm-pipeline.py`. But sometimes it is necessary to write a step
-script that performs a slow synchronous operation in order to emit
-tasks. For example, you might have a very large input file that you want to
+script that performs a slow synchronous operation in order to emit tasks.
+For example, you might have a very large input file that you want to
 process in smaller pieces. You can use `split` to break the file into
 pieces and emit task names such as `xaa`, `xab` etc, but you must do this
 synchronously (i.e., in the step script, not in a script submitted to
