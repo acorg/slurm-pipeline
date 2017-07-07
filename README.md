@@ -6,6 +6,20 @@ A Python class for scheduling and examining
 
 Runs under Python 2.7, 3.5, and [pypy](http://pypy.org/).
 
+## Installation
+
+I assume that a person has installed [python](https://python.org/), [pip](https://pypi.python.org/pypi/pip) and [git](https://git-scm.com/downloads). Then, installation should be straight forward -just execute below instructions
+
+```
+$ cd ~
+$ git clone https://github.com/acorg/slurm-pipeline
+$ cd slurm-pipeline
+$ pip install -r requirements-2.txt
+$ python setup.py install
+$ which slurm-pipeline.py
+/usr/local/bin/slurm-pipeline.py
+```
+
 ## Scripts
 
 The `bin` directory of this repo contains two Python scripts:
@@ -341,7 +355,7 @@ look like they are submitting jobs to `sbatch`).
     will be appended to `squeue -u`.
 * `--printUnfinished`: If specified, just print a list of job ids that have
     not yet finished. This can be used to cancel a job, via e.g.,
-    
+
     ```sh
     $ slurm-pipeline-status.py --specification spec.json --printUnfinished  | xargs -r scancel
     ```
@@ -350,7 +364,7 @@ look like they are submitting jobs to `sbatch`).
     `--startAfter` option to `slurm-pipeline.py` to make it schedule a
     different specification to run only after the given specification
     finishes. E.g.,
-    
+
     ```sh
     # Start a first specification and save its status:
     $ slurm-pipeline.py --specification spec1.json > spec1-status.json
