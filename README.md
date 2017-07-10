@@ -8,16 +8,19 @@ Runs under Python 2.7, 3.5, and [pypy](http://pypy.org/).
 
 ## Installation
 
-I assume that a person has installed [python](https://python.org/), [pip](https://pypi.python.org/pypi/pip) and [git](https://git-scm.com/downloads). Then, installation should be straight forward -just execute below instructions
+I assume that a person has installed [python](https://python.org/), [pip](https://pypi.python.org/pypi/pip) and [git](https://git-scm.com/downloads). Then, installation should be straight forward -just execute below instructions.
 
 ```
+# Clone repository
 $ cd ~
 $ git clone https://github.com/acorg/slurm-pipeline
 $ cd slurm-pipeline
+
+# Install dependencies: requirements-2.txt for Python 2 or requirements-3.txt for Python 3
 $ pip install -r requirements-2.txt
+
+# Install software as a python module
 $ python setup.py install
-$ which slurm-pipeline.py
-/usr/local/bin/slurm-pipeline.py
 ```
 
 ## Scripts
