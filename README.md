@@ -250,7 +250,8 @@ You've already seen most of the specification file directives above. Here's
 the full list:
 
 * `name`: the name of the step (required).
-* `script`: the script to run (required).
+* `script`: the script to run (required). If given as a relative path, it must
+   be relative to the `cwd` specification, if any.
 * `cwd`: the directory to run the script in. If no directory is given, the
    script will be run in the directory where you invoke
    `slurm-pipeline.py`.
