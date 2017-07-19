@@ -19,6 +19,25 @@ class TestSlurmPipeline(TestCase):
     """
     Tests for the slurm_pipeline.pipeline.SlurmPipeline class.
     """
+    @patch('os.path.isdir')
+    def testNonexistentDir(self, isdirMock):
+        """
+        If a step has a 'cwd' key that mentions a non-existent directory, a
+        SpecificationError must be raised.
+        """
+        isdirMock.return_value = False
+        error = ("^Specification step 1 specifies a working directory "
+                 "\('dir'\) that does not exist")
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
+                          {
+                              'steps': [
+                                  {
+                                      'cwd': 'dir',
+                                      'name': 'name',
+                                      'script': 'script',
+                                  },
+                              ]
+                          })
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -80,8 +99,9 @@ class TestSlurmPipeline(TestCase):
     @patch('os.access')
     @patch('os.path.exists')
     @patch('os.path.isabs')
-    def testAccessAndExistsAreCalledWithCwd(self, isabsMock, existsMock,
-                                            accessMock):
+    @patch('os.path.isdir')
+    def testAccessAndExistsAreCalledWithCwd(self, isdirMock, isabsMock,
+                                            existsMock, accessMock):
         """
         os.access, os.path.exists, and os.path.isabs must all be called as
         expected, including the cwd from the step, as the specification is
@@ -106,8 +126,9 @@ class TestSlurmPipeline(TestCase):
     @patch('os.access')
     @patch('os.path.exists')
     @patch('os.path.isabs')
+    @patch('os.path.isdir')
     def testAccessAndExistsAreCalledWithAbsolutePathScript(
-            self, isabsMock, existsMock, accessMock):
+            self, isdirMock, isabsMock, existsMock, accessMock):
         """
         os.access, os.path.exists, and os.path.isabs must all be called as
         expected when the script path is absolute, as the specification is
@@ -774,17 +795,15 @@ class TestSlurmPipeline(TestCase):
                          env['SP_DEPENDENCY_ARG'])
 
     @patch('subprocess.check_output')
-    @patch('os.path.abspath')
     @patch('os.access')
     @patch('os.path.exists')
     def testCwdWithRelativeScriptPath(self, existsMock, accessMock,
-                                      abspathMock, subprocessMock):
+                                      subprocessMock):
         """
         If a step has a cwd set and its script is a relative path, the path of
-        the executed script that is executed must be adjusted to be absolute.
+        the executed script that is executed must be as specified (not
+        converted to an absolute path).
         """
-
-        abspathMock.return_value = '/fictional/path'
         subprocessMock.return_value = ''
 
         sp = SlurmPipeline(
@@ -800,7 +819,7 @@ class TestSlurmPipeline(TestCase):
         sp.schedule()
 
         subprocessMock.assert_has_calls([
-            call(['/fictional/path'], cwd='/tmp', universal_newlines=True,
+            call(['script1'], cwd='/tmp', universal_newlines=True,
                  stdin=DEVNULL, env=ANY),
         ])
 

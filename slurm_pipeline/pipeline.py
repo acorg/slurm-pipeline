@@ -48,10 +48,14 @@ class SlurmPipeline(SlurmPipelineBase):
             except KeyError:
                 script = step['script']
             else:
+                if not path.isdir(cwd):
+                    raise SpecificationError(
+                        'Specification step %d specifies a working directory '
+                        '(%r) that does not exist' % (count, cwd))
+
                 script = step['script']
                 if not path.isabs(script):
-                    if cwd:
-                        script = path.join(cwd, script)
+                    script = path.join(cwd, script)
 
             if not path.exists(script):
                 raise SpecificationError(
@@ -61,7 +65,7 @@ class SlurmPipeline(SlurmPipelineBase):
             if not os.access(script, os.X_OK):
                 raise SpecificationError(
                     'The script %r in step %d is not executable' %
-                    (script, count))
+                    (step['script'], count))
 
     def schedule(self, force=False, firstStep=None, lastStep=None, sleep=0.0,
                  scriptArgs=None, skip=None, startAfter=None, nice=None):
@@ -279,23 +283,9 @@ class SlurmPipeline(SlurmPipelineBase):
         @param args: A C{list} of command-line arguments.
         @raise SchedulingError: If a script outputs a task name more than once.
         """
-        script = step['script']
-        try:
-            cwd = step['cwd']
-        except KeyError:
-            # No working directory was given. Run the script from our
-            # current directory.
-            cwd = '.'
-        else:
-            # A working directory was given, so make sure we have an
-            # absolute path to the script so we can run it from that
-            # directory.
-            if not path.isabs(script):
-                script = path.abspath(script)
-
         step['stdout'] = subprocess.check_output(
-            [script] + args, cwd=cwd, env=env, stdin=DEVNULL,
-            universal_newlines=True)
+            [step['script']] + args, cwd=step.get('cwd', '.'), env=env,
+            stdin=DEVNULL, universal_newlines=True)
 
         # Look at all output lines for task names and SLURM job ids created
         # (if any) by this script. Ignore any non-matching output.
@@ -311,7 +301,7 @@ class SlurmPipeline(SlurmPipelineBase):
                     raise SchedulingError(
                         'Task name %r was output with a duplicate in its job '
                         'ids %r by %r script in step named %r' %
-                        (taskName, jobIds, script, step['name']))
+                        (taskName, jobIds, step['script'], step['name']))
                 tasks[taskName].update(jobIds)
 
     def _checkRuntime(self, steps, firstStep=None, lastStep=None, skip=None,
