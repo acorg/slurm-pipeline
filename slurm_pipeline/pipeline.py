@@ -40,23 +40,28 @@ class SlurmPipeline(SlurmPipelineBase):
         @raise SpecificationError: if there is anything wrong with the
             specification.
         """
-        if 'scheduledAt' in specification:
-            raise SpecificationError(
-                "The specification has a top-level 'scheduledAt' key, "
-                'but was not passed as a status specification')
+        SlurmPipelineBase.checkSpecification(specification)
 
         for count, step in enumerate(specification['steps'], start=1):
-            if not path.exists(step['script']):
+            try:
+                cwd = step['cwd']
+            except KeyError:
+                script = step['script']
+            else:
+                script = step['script']
+                if not path.isabs(script):
+                    if cwd:
+                        script = path.join(cwd, script)
+
+            if not path.exists(script):
                 raise SpecificationError(
                     'The script %r in step %d does not exist' %
                     (step['script'], count))
 
-            if not os.access(step['script'], os.X_OK):
+            if not os.access(script, os.X_OK):
                 raise SpecificationError(
                     'The script %r in step %d is not executable' %
-                    (step['script'], count))
-
-        SlurmPipelineBase.checkSpecification(specification)
+                    (script, count))
 
     def schedule(self, force=False, firstStep=None, lastStep=None, sleep=0.0,
                  scriptArgs=None, skip=None, startAfter=None, nice=None):

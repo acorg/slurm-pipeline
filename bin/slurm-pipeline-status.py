@@ -25,23 +25,23 @@ parser.add_argument(
           'in JSON format.'))
 
 parser.add_argument(
-    '--squeueArgs', nargs='*', default=None,
+    '--squeueArgs', nargs='*',
     help=('A list of arguments to pass to squeue (including the squeue '
-          "command itself). If not specified, the user's login name will "
-          'be appended to squeue -u.'))
+          'command itself). If not specified, "squeue -u USERNAME" is '
+          "used, where USERNAME is the user's login name."))
 
 parser.add_argument(
     '--printUnfinished', default=False, action='store_true',
     help=('If specified, print a list of job ids that have not yet finished. '
-          'This can easily be used to cancel a job, via e.g., '
-          '%s --printUnfinished -s spec.json | xargs scancel' % sys.argv[0]))
+          'This can be used to cancel a job, via e.g., '
+          '%s --printUnfinished -s status.json | xargs scancel' % sys.argv[0]))
 
 parser.add_argument(
     '--printFinal', default=False, action='store_true',
     help=('If specified, print a list of job ids issued by the final steps '
           'of a specification. This can be used with the --startAfter option '
           'to slurm-pipeline.py to make it schedule a different specification '
-          'to run only after the given specification finishes.'))
+          'to run after the given specification is completely finished.'))
 
 args = parser.parse_args()
 
