@@ -79,7 +79,7 @@ class SlurmPipelineBase(object):
                     'The name %r of step %d was already used in '
                     'an earlier step' % (stepName, count))
 
-            if 'collect' in step and not step.get('dependencies', None):
+            if 'collect' in step and not step.get('dependencies'):
                 raise SpecificationError(
                     "Step %d (%r) is a 'collect' step but does not have any "
                     "dependencies" %

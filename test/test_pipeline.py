@@ -1,4 +1,4 @@
-from os import X_OK
+from os import X_OK, path
 from unittest import TestCase
 from six import assertRaisesRegex
 from json import dumps
@@ -22,13 +22,32 @@ class TestSlurmPipeline(TestCase):
 
     @patch('os.access')
     @patch('os.path.exists')
-    def testAccessFails(self, existsMock, accessMock):
+    def testNonexecutableScript(self, existsMock, accessMock):
         """
         If os.access fails, a SpecificationError must be raised.
         """
         accessMock.return_value = False
 
         error = "^The script 'script' in step 1 is not executable$"
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
+                          {
+                              'steps': [
+                                  {
+                                      'name': 'name',
+                                      'script': 'script',
+                                  },
+                              ]
+                          })
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testNonexistentScript(self, existsMock, accessMock):
+        """
+        If a step has a 'script' key that mentions a non-existent file, a
+        SpecificationError must be raised.
+        """
+        existsMock.return_value = False
+        error = "^The script 'script' in step 1 does not exist$"
         assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
                           {
                               'steps': [
@@ -58,20 +77,55 @@ class TestSlurmPipeline(TestCase):
         existsMock.assert_called_once_with('script')
         accessMock.assert_called_once_with('script', X_OK)
 
-    def testNonexistentScript(self):
+    @patch('os.access')
+    @patch('os.path.exists')
+    @patch('os.path.isabs')
+    def testAccessAndExistsAreCalledWithCwd(self, isabsMock, existsMock,
+                                            accessMock):
         """
-        If a step has a 'script' key that mentions a non-existent file, a
-        SpecificationError must be raised.
+        os.access, os.path.exists, and os.path.isabs must all be called as
+        expected, including the cwd from the step, as the specification is
+        checked.
         """
-        error = "^The script 'script' in step 1 does not exist$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        isabsMock.return_value = False
+        SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'cwd': 'dir',
+                        'name': 'name',
+                        'script': 'script',
+                    },
+                ]
+            })
+        script = path.join('dir', 'script')
+        isabsMock.assert_called_once_with('script')
+        existsMock.assert_called_once_with(script)
+        accessMock.assert_called_once_with(script, X_OK)
+
+    @patch('os.access')
+    @patch('os.path.exists')
+    @patch('os.path.isabs')
+    def testAccessAndExistsAreCalledWithAbsolutePathScript(
+            self, isabsMock, existsMock, accessMock):
+        """
+        os.access, os.path.exists, and os.path.isabs must all be called as
+        expected when the script path is absolute, as the specification is
+        checked.
+        """
+        SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'cwd': 'dir',
+                        'name': 'name',
+                        'script': '/bin/script',
+                    },
+                ]
+            })
+        isabsMock.assert_called_once_with('/bin/script')
+        existsMock.assert_called_once_with('/bin/script')
+        accessMock.assert_called_once_with('/bin/script', X_OK)
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -199,18 +253,6 @@ class TestSlurmPipeline(TestCase):
         self.assertNotIn('scheduledAt', sp.specification)
         specification = sp.schedule()
         self.assertIsInstance(specification['scheduledAt'], float)
-
-    def testAlreadyScheduled(self):
-        """
-        If a specification with a top-level 'scheduledAt' key is passed to
-        SlurmPipeline, a SpecificationError must be raised.
-        """
-        error = ("^The specification has a top-level 'scheduledAt' key, but "
-                 'was not passed as a status specification$')
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline, {
-            'scheduledAt': None,
-            'steps': [],
-        })
 
     @patch('subprocess.check_output')
     @patch('os.access')
