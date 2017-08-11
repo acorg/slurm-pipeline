@@ -281,11 +281,28 @@ class SlurmPipeline(SlurmPipelineBase):
         @param step: A C{dict} with a job specification.
         @param env: A C{str} key to C{str} value environment for the script.
         @param args: A C{list} of command-line arguments.
-        @raise SchedulingError: If a script outputs a task name more than once.
+        @raise SchedulingError: If a script outputs a task name more than once
+            or if the step script cannot be executed.
         """
-        step['stdout'] = subprocess.check_output(
-            [step['script']] + args, cwd=step.get('cwd', '.'), env=env,
-            stdin=DEVNULL, universal_newlines=True)
+        try:
+            step['stdout'] = subprocess.check_output(
+                [step['script']] + args, cwd=step.get('cwd', '.'), env=env,
+                stdin=DEVNULL, universal_newlines=True)
+        except subprocess.CalledProcessError as e:
+            import sys
+            if sys.version_info >= (3, 5):
+                raise SchedulingError(
+                    "Could not execute step '%s' script '%s' in directory "
+                    "'%s'. Attempted command: '%s'. Exit status: %s. Standard "
+                    "output: '%s'. Standard error: '%s'." % (
+                        step['name'], step['script'], step.get('cwd', '.'),
+                        e.cmd, e.returncode, e.output, e.stderr))
+            else:
+                raise SchedulingError(
+                    "Could not execute step '%s' script '%s' in directory "
+                    "'%s'. Attempted command: '%s'. Exit status: %s."
+                    % (step['name'], step['script'],  step.get('cwd', '.'),
+                       e.cmd, e.returncode))
 
         # Look at all output lines for task names and SLURM job ids created
         # (if any) by this script. Ignore any non-matching output.

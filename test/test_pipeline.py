@@ -3,6 +3,8 @@ from unittest import TestCase
 from six import assertRaisesRegex
 from json import dumps
 import platform
+from subprocess import CalledProcessError
+from sys import version_info
 
 from slurm_pipeline.pipeline import SlurmPipeline, DEVNULL
 from slurm_pipeline.error import SchedulingError, SpecificationError
@@ -797,7 +799,8 @@ class TestSlurmPipeline(TestCase):
     @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
-    def testCwdWithRelativeScriptPath(self, existsMock, accessMock,
+    @patch('os.path.isdir')
+    def testCwdWithRelativeScriptPath(self, isdirMock, existsMock, accessMock,
                                       subprocessMock):
         """
         If a step has a cwd set and its script is a relative path, the path of
@@ -1682,3 +1685,41 @@ class TestSlurmPipeline(TestCase):
                  "\[-10000, 10000\] range$")
         assertRaisesRegex(self, SchedulingError, error, sp.schedule,
                           nice=-10001)
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    @patch('os.path.isdir')
+    def testSubprocessExecRaises(self, isdirMock, existsMock, accessMock,
+                                 subprocessMock):
+        """
+        If subprocess.check_output raises CalledProcessError, we must
+        raise a corresponding SchedulingError.
+        """
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'cwd': 'dir',
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+
+        if version_info >= (3, 5):
+            subprocessMock.side_effect = CalledProcessError(
+                3, 'command.sh', output='the stdout', stderr='the stderr')
+
+            error = ("^Could not execute step 'name1' script 'script1' in "
+                     "directory 'dir'\. Attempted command: 'command.sh'\. "
+                     "Exit status: 3\. Standard output: 'the stdout'\. "
+                     "Standard error: 'the stderr'\.$")
+        else:
+            subprocessMock.side_effect = CalledProcessError(3, 'command.sh')
+
+            error = ("^Could not execute step 'name1' script 'script1' in "
+                     "directory 'dir'\. Attempted command: 'command.sh'\. "
+                     "Exit status: 3\.$")
+
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule)
