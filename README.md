@@ -34,7 +34,7 @@ $ python setup.py install
 
 ## Scripts
 
-The `bin` directory of this repo contains two Python scripts:
+The `bin` directory of this repo contains the following Python scripts:
 
 * `slurm-pipeline.py` schedules programs to be run in an organized pipeline
   fashion on a Linux cluster that uses SLURM as a workload manager.
@@ -51,6 +51,7 @@ The `bin` directory of this repo contains two Python scripts:
   pipeline (useful for making sure that jobs scheduled in a subsequent run
   of `slurm-pipeline.py` do not begin until the given pipeline has
   finished). See below for more information.
+* `slurm-pipeline-version.py` prints the version number.
 
 ## Specification
 
