@@ -37,4 +37,4 @@ clean:
 # The upload target requires that you have access rights to PYPI.
 upload:
 	python setup.py sdist
-	twine upload dist/slurm-pipeline-$$(bin/slurm-pipeline-version.py).tar.gz
+	export PYTHONPATH=`pwd`; twine upload dist/slurm-pipeline-$$(bin/slurm-pipeline-version.py).tar.gz
