@@ -181,15 +181,14 @@ the `word-count` example below for sample output.
 * `--firstStep step-name`: Step scripts are always run with an environment
   variable called `SP_SIMULATE`. Normally this will be set to `0` for all
   steps. Sometimes though, you may want to start a pipeline from one of its
-  intermediate steps and not re-do the work of earlier steps. Using
-  `--firstStep step-name` Will cause `step-name` to be run with
-  `SP_SIMULATE=0` in its environment. Earlier steps in the pipeline will be
-  run with `SP_SIMULATE=1`. It is up to the scripts to decide how to act
-  when `SP_SIMULATE=1`.
+  intermediate steps and not re-do the work of earlier steps. If you specify
+  `--firstStep step-name`, the steps before `step-name` will be invoked with
+  `SP_SIMULATE=1` in their environment. It is up to the scripts to decide how
+  to act when `SP_SIMULATE=1`.
 * `--lastStep step-name`: Corresponds to `--firstStep`, except it turns
-  simulation back on (i.e., sets `SP_SIMULATE=1`) after the named step.
-  Note that `--firstStep` and `--lastStep` may specify the same step (to
-  just run that step) and that `--firstStep` may be given without also
+  simulation back on (i.e., sets `SP_SIMULATE=1`) for steps after the named
+  step. Note that `--firstStep` and `--lastStep` may specify the same step
+  (to just run that step) and that `--firstStep` may be given without also
   giving `--lastStep`.
 * `--skip`: Used to tell `slurm-pipeline.py` to tell a step script that it
   should be skipped. In this case the script should act as though it is not
