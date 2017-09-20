@@ -222,14 +222,14 @@ by any other method).  So if `stdout` is a terminal, `slurm-pipeline.py`
 tries to help by writing the status specification to a temporary file (as
 well as `stdout`) and prints its location (to `stderr`).
 
-### Why are all scripts always executed?
+### Why are all step scripts always executed?
 
 All scripts are always executed because `slurm-pipeline.py` cannot know
 what arguments to pass to intermediate step scripts to run them in
-isolaion. In a normal run with no simulated steps, steps emit task names
-that are passed through the pipeline to subsequent steps. If the earlier
-steps are not run, `slurm-pipeline.py` cannot know what task argument to
-pass to those later steps.
+isolaion. In a normal run with no simulated or skipped steps, steps emit
+task names that are passed through the pipeline to subsequent steps. If the
+earlier steps are not run, `slurm-pipeline.py` cannot know what task
+argument to pass to those later steps.
 
 It is also conceptually easier to know that `slurm-pipeline.py` always runs
 all pipeline step scripts, whether or not they are simulating or being
@@ -247,17 +247,19 @@ simulation (as opposed to skipping), the script has already done its work
 
 Skipping refers to when a step is really no longer in the pipeline. A step
 that skips will normally just want to pass along its input to its output
-unchanged. The step still needs to be run so that it can make sure that its
-subsequent step(s) do not fail. It can be more convenient to add `"skip":
-true` to a specification file to completely get rid of a step rather than
-changing the subsequent step to take its input from the location the
-stepped script would use. Being able to use `--skip step-name` on the
-command line provides an easy way to skip a step.
+unchanged. I.e., the step must act as though it were not in the pipeline.
+The step still needs to be run so that it can make sure that subsequent
+steps do not fail. It can be more convenient to add `"skip": true` to a
+specification file to completely get rid of a step rather than changing the
+subsequent step to take its input from the location the stepped script
+would use. Using `--skip step-name` on the command line also provides an
+easy way to skip a step.
 
 In summary, a simulated step doesn't do anything because its work was
 already done on a previous run, but a skipped step pretends it's not there
 at all (normally by copying its input to its output unchanged). The skipped
-step *never* does anything, the simulated step has *already* done its work.
+step *never* does any work, whereas the simulated step has *already* done
+its work.
 
 ## Specification file directives
 
