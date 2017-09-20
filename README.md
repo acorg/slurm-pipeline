@@ -208,8 +208,9 @@ the `word-count` example below for sample output.
   example).
 
 Note that all script steps are *always* executed, including when
-`--firstStep` or `--skip` are used. It is up to the scripts to decide what
-to do (based on the `SP_*` environment variables) in those cases.
+`--firstStep` or `--skip` are used. See below for the reasoning behind
+this.  It is up to the scripts to decide what to do (based on the `SP_*`
+environment variables) in those cases.
 
 `slurm-pipeline.py` prints an updated specification to `stdout`. You will
 probably always want to save this to a file so you can later pass it to
@@ -220,6 +221,20 @@ hard to know which jobs were started by which run of `slurm-pipeline.py` or
 by any other method).  So if `stdout` is a terminal, `slurm-pipeline.py`
 tries to help by writing the status specification to a temporary file (as
 well as `stdout`) and prints its location (to `stderr`).
+
+### Why are all scripts always executed?
+
+All scripts are always executed because `slurm-pipeline.py` cannot know
+what arguments to pass to intermediate step scripts to run them in
+isolaion. In a normal run with no simulated steps, steps emit task names
+that are passed through the pipeline to subsequent steps. If the earlier
+steps are not run, `slurm-pipeline.py` cannot know what task argument to
+pass to those later steps.
+
+It is also conceptually easier to know that `slurm-pipeline.py` always runs
+all pipeline step scripts, whether or not they are simulating or being
+skipped (see the Separation of concerns section below).  Simulated steps
+may want to log the fact that they were run in simulated mode, etc.
 
 ### Simulating versus skipping
 
@@ -243,15 +258,6 @@ In summary, a simulated step doesn't do anything because its work was
 already done on a previous run, but a skipped step pretends it's not there
 at all (normally by copying its input to its output unchanged). The skipped
 step *never* does anything, the simulated step has *already* done its work.
-
-### Why are all scripts always executed?
-
-It is cleaner to implement partial pipeline operation as above because it
-would otherwise be unclear how to invoke intermediate step scripts if the
-earlier scripts had not emitted any task names.  Simulated steps may still
-want to log the fact that they were run in simulated mode, etc. And it's
-conceptually easier to know that `slurm-pipeline.py` always runs all
-pipeline step scripts (see the Separation of concerns section below).
 
 ## Specification file directives
 
