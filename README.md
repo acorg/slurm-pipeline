@@ -55,9 +55,9 @@ The `bin` directory of this repo contains the following Python scripts:
 
 ## Specification
 
-A run is schedule according to a pipeline specification file in JSON format
-which is given to `slurm-pipeline.py`. Several examples of these can be
-found under [`examples`](examples). Here's the one from
+A run is scheduled according to a pipeline specification file in JSON
+format which is given to `slurm-pipeline.py`. Several examples of these can
+be found under [`examples`](examples). Here's the one from
 [`examples/word-count/specification.json`](examples/word-count/specification.json):
 
 ```json
