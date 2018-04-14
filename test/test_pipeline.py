@@ -1,4 +1,5 @@
 from os import X_OK, path
+from os import getlogin
 from unittest import TestCase
 from six import assertRaisesRegex
 from json import dumps
@@ -1498,6 +1499,7 @@ class TestSlurmPipeline(TestCase):
         specification = sp.schedule(firstStep='name2', force=True)
         expected = dumps(
             {
+                'user': getlogin(),
                 'firstStep': 'name2',
                 'lastStep': None,
                 'nice': None,

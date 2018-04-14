@@ -2,9 +2,9 @@
 
 """
 Use the SlurmPipeline class to schedule the running of a pipeline job from its
-specification, printing (to stdout) a detailed specification that includes job
-ids. The status can be saved to a file and later given to
-slurm-pipeline-status.py to monitor job progress.
+specification, printing (to stdout or to the file named by --output) a detailed
+specification that includes job ids. The printed status can be saved to a file
+and later given to slurm-pipeline-status.py to monitor job progress.
 """
 
 from __future__ import print_function
@@ -12,7 +12,6 @@ from __future__ import print_function
 import sys
 import os
 import argparse
-from tempfile import mkstemp
 
 from slurm_pipeline import SlurmPipeline
 
@@ -71,9 +70,10 @@ parser.add_argument(
           'users can specify a negative adjustment.'))
 
 parser.add_argument(
-    '--outputSpecification', '-o', default=None,
-    help=('The name of the file to which the pipeline status specification, '
-          'are written in JSON format.'))
+    '--output', '-o', default=sys.stdout,
+    type=argparse.FileType('w'), nargs='?',
+    help=('The name of the file to write the pipeline status to (in JSON '
+          'format). Default is standard output.'))
 
 args, scriptArgs = parser.parse_known_args()
 
@@ -88,18 +88,15 @@ status = sp.schedule(
 
 statusAsJSON = sp.specificationToJSON(status)
 
-if not args.outputSpecification:
-    print(statusAsJSON)
-else:
-    with open(args.outputSpecification, 'w') as output_specification:
-        output_specification.write(statusAsJSON)
-        output_specification.write('\n')
+print(statusAsJSON, file=args.output)
 
-# If the user forgot to redirect output to a file, save it to a tempfile
-# for them and let them know where it is. We do this because without the
-# status they will have no way to examine the job with
-# slurm-pipeline-status.py
-if os.isatty(1) and not args.outputSpecification:
+
+# If the user did not redirect output to a file or specify an output file,
+# save the status to a tempfile for them and let them know where it is. We
+# do this because without the status they will have no way to examine the
+# job with slurm-pipeline-status.py
+if os.isatty(1) and args.output is sys.stdout:
+    from tempfile import mkstemp
     fd, filename = mkstemp(prefix='slurm-pipeline-status-', suffix='.json')
     print('WARNING: You did not save stdout to a file, so I have '
           'saved the specification status to %r for you.' % filename,

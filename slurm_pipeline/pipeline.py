@@ -4,6 +4,7 @@ import re
 import time
 import subprocess
 from collections import defaultdict
+from os import getlogin
 
 try:
     from subprocess import DEVNULL  # py3k
@@ -117,8 +118,8 @@ class SlurmPipeline(SlurmPipelineBase):
         skip = set(skip or ())
         self._checkRuntime(steps, firstStep, lastStep, skip, nice)
         specification.update({
-            'force': force,
             'firstStep': firstStep,
+            'force': force,
             'lastStep': lastStep,
             'nice': nice,
             'scheduledAt': time.time(),
@@ -126,6 +127,7 @@ class SlurmPipeline(SlurmPipelineBase):
             'skip': skip,
             'startAfter': startAfter,
             'steps': steps,
+            'user': getlogin(),
         })
 
         environ['SP_FORCE'] = str(int(force))
@@ -245,18 +247,18 @@ class SlurmPipeline(SlurmPipelineBase):
                     self._runStepScript(step, [taskName], env)
         else:
             # Either this step has no dependencies or the steps it is
-            # dependent on did not start any tasks. If there are no
-            # dependencies, run the script with the originally passed
-            # command line arguments (if any) and the --startAfter job
-            # dependencies (if any). If there were dependencies but no
-            # tasks have been started, run the step with no command line
-            # arguments.
-
+            # dependent on did not start any tasks.
             env = environ.copy()
             if 'dependencies' in step:
+                # The step has dependencies, but the dependent steps did
+                # not start any tasks. Run the step as though there were no
+                # dependencies.
                 args = []
                 env.pop('SP_DEPENDENCY_ARG', None)
             else:
+                # The step has no dependencies. Run it with the original
+                # command line arguments and put any --startAfter job ids
+                # into the SP_DEPENDENCY_ARG environment variable.
                 args = [] if scriptArgs is None else list(map(str, scriptArgs))
                 if startAfter:
                     dependencies = ','.join(

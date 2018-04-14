@@ -10,9 +10,5 @@ class SpecificationError(SlurmPipelineError):
     'An error was found in a specification.'
 
 
-class SQueueError(SlurmPipelineError):
-    'A problem was found in the output of squeue'
-
-
 class SAcctError(SlurmPipelineError):
-    'A problem was found in the output of sacct'
+    'A problem was found in the output of sacct.'

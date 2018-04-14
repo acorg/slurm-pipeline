@@ -25,7 +25,8 @@ Using [git](https://git-scm.com/downloads):
 $ git clone https://github.com/acorg/slurm-pipeline
 $ cd slurm-pipeline
 
-# Install dependencies: requirements-2.txt for Python 2 or requirements-3.txt for Python 3.
+# Install dependencies: requirements-2.txt for Python 2, requirements-3.txt
+# for Python 3, requirements-pypy.txt for PyPy.
 $ pip install -r requirements-2.txt
 
 # Install.
@@ -173,7 +174,10 @@ the `word-count` example below for sample output.
 
 `slurm-pipeline.py` accepts the following options:
 
-* `--specification filename`: as described above. Required.
+* `--specification filename`: Described above. Required.
+* `--output filename`: Specify the file to which pipeline status
+  information should be written to (in JSON format). Defaults to standard
+  output.
 * `--force`: Will cause `SP_FORCE` to be set in the environment of step
   scripts with a value of `1`. It is up to the individual scripts to notice
   this and act accordingly. If `--force` is not used, `SP_FORCE` will be
@@ -212,15 +216,16 @@ Note that all script steps are *always* executed, including when
 this.  It is up to the scripts to decide what to do (based on the `SP_*`
 environment variables) in those cases.
 
-`slurm-pipeline.py` prints an updated specification to `stdout`. You will
-probably always want to save this to a file so you can later pass it to
-`slurm-pipeline-status.py`. If you forget to redirect `stdout`, information
-about the progress of the scheduled pipeline can be very difficult to
-recover (you may have many other jobs already scheduled, so it can be very
-hard to know which jobs were started by which run of `slurm-pipeline.py` or
-by any other method).  So if `stdout` is a terminal, `slurm-pipeline.py`
-tries to help by writing the status specification to a temporary file (as
-well as `stdout`) and prints its location (to `stderr`).
+`slurm-pipeline.py` prints an updated specification to `stdout` or to the
+file specified with `--output`. You will probably always want to save this
+to a file so you can later pass it to `slurm-pipeline-status.py`. If you
+forget to redirect `stdout` (and don't use `--output`), information about
+the progress of the scheduled pipeline can be very difficult to recover
+(you may have many other jobs already scheduled, so it can be very hard to
+know which jobs were started by which run of `slurm-pipeline.py` or by any
+other method).  So if `stdout` is a terminal, `slurm-pipeline.py` tries to
+help by writing the status specification to a temporary file (as well as
+`stdout`) and prints that file's location (to `stderr`).
 
 ### Why are all step scripts always executed?
 
@@ -258,8 +263,8 @@ easy way to skip a step.
 In summary, a simulated step doesn't do anything because its work was
 already done on a previous run, but a skipped step pretends it's not there
 at all (normally by copying its input to its output unchanged). The skipped
-step *never* does any work, whereas the simulated step has *already* done
-its work.
+step *never* does any real work, whereas the simulated step has *already*
+done its work.
 
 ## Specification file directives
 
@@ -803,3 +808,17 @@ least to run `slurm-pipeline.py` using `nice`.
   job id lines in a script's stdout to the `SlurmPipeline` constructor
   (instead of using the currently hard-coded `TASK: name
   [jobid1 [jobid2 [...]]]`).
+
+## Contributors
+
+This code was originally written (and is maintained) by
+[Terry Jones (@terrycojones)](https://github.com/terrycojones).
+
+Contributions have been received from:
+
+* [Eric Müller (@muffgaga)](https://github.com/muffgaga)
+* [healther](https://github.com/healther)
+* [ldynia](https://github.com/ldynia)
+* [schmitts](https://github.com/schmitts)
+
+Pull requests very welcome!

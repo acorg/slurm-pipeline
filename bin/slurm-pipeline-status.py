@@ -12,6 +12,7 @@ specification status, as originally printed by slurm-pipeline.py.
 import argparse
 
 from slurm_pipeline import SlurmPipelineStatus
+from slurm_pipeline.sacct import SAcct
 
 
 parser = argparse.ArgumentParser(
@@ -25,36 +26,44 @@ parser.add_argument(
           'in JSON format.'))
 
 parser.add_argument(
-    '--squeueArgs', nargs='*',
-    help=('A list of arguments to pass to squeue (including the squeue '
-          'command itself). If not specified, "squeue -u USERNAME" is '
-          "used, where USERNAME is the user's login name."))
+    '--fieldNames', nargs='*', default=' '.join(SAcct.DEFAULT_FIELD_NAMES),
+    help=('A list of SLURM job field names to obtain from sacct for listing '
+          'job status information. See man sacct for the full list of '
+          'possible field names.'))
 
-parser.add_argument(
+# Only one of --printUnfinished, --printFinished, or --printFinal can be given.
+group = parser.add_mutually_exclusive_group()
+
+group.add_argument(
     '--printUnfinished', default=False, action='store_true',
-    help=('If specified, print a list of job ids that have not yet finished. '
-          'This can be used to cancel a job, via e.g., '
+    help=('Print a list of job ids that have not yet finished. This can be '
+          'used to cancel a job, e.g., with: '
           '%s --printUnfinished -s status.json | xargs scancel' % sys.argv[0]))
 
-parser.add_argument(
-    '--printFinished', default=False, action='store_true')
+group.add_argument(
+    '--printFinished', default=False, action='store_true',
+    help='Print a list of job ids that are finished.')
 
-parser.add_argument(
+group.add_argument(
     '--printFinal', default=False, action='store_true',
-    help=('If specified, print a list of job ids issued by the final steps '
-          'of a specification. This can be used with the --startAfter option '
-          'to slurm-pipeline.py to make it schedule a different specification '
-          'to run after the given specification is completely finished.'))
+    help=('Print a list of job ids issued by the final steps of a '
+          'specification. This can be used with the --startAfter option in a '
+          'subsequent call to slurm-pipeline.py to have it arrange that a '
+          'different specification only run after the given specification is '
+          'completely finished.'))
 
 args = parser.parse_args()
 
-status = SlurmPipelineStatus(args.specification)
+status = SlurmPipelineStatus(args.specification, fieldNames=args.fieldNames)
 
 if args.printFinal:
     print('\n'.join(map(str, status.finalJobs())))
-elif args.printUnfinished:
-    print('\n'.join(map(str, status.unfinishedJobs(squeueArgs=args.squeueArgs))))
+
 elif args.printFinished:
     print('\n'.join(map(str, status.finishedJobs())))
+
+elif args.printUnfinished:
+    print('\n'.join(map(str, status.unfinishedJobs())))
+
 else:
-    print(status.toStr(args.squeueArgs))
+    print(status.toStr())

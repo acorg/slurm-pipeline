@@ -152,21 +152,19 @@ class SlurmPipelineBase(object):
         return dumps(specification, sort_keys=True, indent=2,
                      separators=(',', ': '))
 
-    @staticmethod
-    def finalSteps(specification):
+    def finalSteps(self):
         """
         Find the specification steps on which nothing depends. These are the
         the steps that must all finish before a specification has fully
         finished running.
 
-        @param specification: A specification C{dict}.
         @return: A C{set} of C{str} step names.
         """
         # This implementation is slightly inefficient, but is easy to
         # understand. It would be faster to just gather all step names that
         # appear in any step dependency and then return the set of all step
         # names minus that set.
-        steps = specification['steps']
+        steps = self.specification['steps']
         result = set()
         for stepName in steps:
             for step in steps.values():

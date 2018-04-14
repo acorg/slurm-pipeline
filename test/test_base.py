@@ -330,7 +330,7 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         spb = SlurmPipelineBase(specification)
-        self.assertEqual(set(('name1',)), spb.finalSteps(spb.specification))
+        self.assertEqual(set(('name1',)), spb.finalSteps())
 
     def testFinalStepsWithTwoSteps(self):
         """
@@ -350,8 +350,7 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         spb = SlurmPipelineBase(specification)
-        self.assertEqual(set(('name1', 'name2')),
-                         spb.finalSteps(spb.specification))
+        self.assertEqual(set(('name1', 'name2')), spb.finalSteps())
 
     def testFinalStepsWithTwoStepsOneDependency(self):
         """
@@ -372,7 +371,7 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         spb = SlurmPipelineBase(specification)
-        self.assertEqual(set(('name2',)), spb.finalSteps(spb.specification))
+        self.assertEqual(set(('name2',)), spb.finalSteps())
 
     def testFinalStepsWithFiveSteps(self):
         """
@@ -406,8 +405,7 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         spb = SlurmPipelineBase(specification)
-        self.assertEqual(set(('name2', 'name5')),
-                         spb.finalSteps(spb.specification))
+        self.assertEqual(set(('name2', 'name5')), spb.finalSteps())
 
     def testFinalStepsWithSixSteps(self):
         """
@@ -446,4 +444,4 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         spb = SlurmPipelineBase(specification)
-        self.assertEqual(set(('name6',)), spb.finalSteps(spb.specification))
+        self.assertEqual(set(('name6',)), spb.finalSteps())
