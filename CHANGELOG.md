@@ -1,3 +1,8 @@
+## Version 2.0.8 - April 15, 2018
+
+Added JobName to list of default job status fields printed by
+`slurm-pipeline-status.py`.
+
 ## Version 2.0.7 - April 15, 2018
 
 Added printing of SP_* environment variables to per-step output of

@@ -23,7 +23,8 @@ class TestSAcct(TestCase):
         subprocessMock.side_effect = OSError('No such file or directory')
         error = (
             "^Encountered OSError \(No such file or directory\) when running "
-            "'sacct -P --format JobId,State,Elapsed,Nodelist --jobs 35,40'$")
+            "'sacct -P --format JobId,JobName,State,Elapsed,Nodelist "
+            "--jobs 35,40'$")
         specification = {
             'scheduledAt': 44,
             'startAfter': None,
@@ -38,9 +39,9 @@ class TestSAcct(TestCase):
         When no sacct field names are passed, it must be called as expected.
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '1|COMPLETED|04:32:00|cpu-3\n'
-            '2|FAILED|05:11:37|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '1|name|COMPLETED|04:32:00|cpu-3\n'
+            '2|name|FAILED|05:11:37|cpu-4\n'
         )
         SAcct({
             'scheduledAt': 44,
@@ -48,7 +49,7 @@ class TestSAcct(TestCase):
             'steps': [],
         }, {1, 2})
         subprocessMock.assert_called_once_with(
-            ['sacct', '-P', '--format', 'JobId,State,Elapsed,Nodelist',
+            ['sacct', '-P', '--format', 'JobId,JobName,State,Elapsed,Nodelist',
              '--jobs', '1,2'],
             universal_newlines=True)
 
@@ -58,9 +59,9 @@ class TestSAcct(TestCase):
         If sacct doesn't mention a needed job id, an SAcctError must be raised.
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '1|COMPLETED|04:32:00|cpu-3\n'
-            '2|FAILED|05:11:37|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '1|name|COMPLETED|04:32:00|cpu-3\n'
+            '2|name|FAILED|05:11:37|cpu-4\n'
         )
 
         error = ('^sacct did not return information about the following job '
@@ -106,12 +107,12 @@ class TestSAcct(TestCase):
         be raised.
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '1|COMPLETED|04:32:00|(none)\n'
-            '1|FAILED|05:11:37|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '1|name|COMPLETED|04:32:00|(none)\n'
+            '1|name|FAILED|05:11:37|cpu-4\n'
         )
         error = ("^Job id 1 found more than once in 'sacct -P --format "
-                 "JobId,State,Elapsed,Nodelist --jobs 1' output$")
+                 "JobId,JobName,State,Elapsed,Nodelist --jobs 1' output$")
         assertRaisesRegex(self, SAcctError, error,  SAcct,
                           {
                               'scheduledAt': 44,
@@ -126,9 +127,9 @@ class TestSAcct(TestCase):
         is no error in the input.
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '1|COMPLETED|04:32:00|(none)\n'
-            '2|FAILED|05:11:37|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '1|name1|COMPLETED|04:32:00|(none)\n'
+            '2|name2|FAILED|05:11:37|cpu-4\n'
         )
         sa = SAcct(
             {
@@ -141,11 +142,13 @@ class TestSAcct(TestCase):
             {
                 1: {
                     'elapsed': '04:32:00',
+                    'jobname': 'name1',
                     'state': 'COMPLETED',
                     'nodelist': '(none)',
                 },
                 2: {
                     'elapsed': '05:11:37',
+                    'jobname': 'name2',
                     'state': 'FAILED',
                     'nodelist': 'cpu-4',
                 },
@@ -161,10 +164,10 @@ class TestSAcct(TestCase):
         for some reason, when you call sacct with no arguments).
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '----- ----- ----- -----\n'
-            '1|COMPLETED|04:32:00|(none)\n'
-            '2|FAILED|05:11:37|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '----- ----- ----- ----- -----\n'
+            '1|name1|COMPLETED|04:32:00|(none)\n'
+            '2|name2|FAILED|05:11:37|cpu-4\n'
         )
         sa = SAcct(
             {
@@ -177,11 +180,13 @@ class TestSAcct(TestCase):
             {
                 1: {
                     'elapsed': '04:32:00',
+                    'jobname': 'name1',
                     'state': 'COMPLETED',
                     'nodelist': '(none)',
                 },
                 2: {
                     'elapsed': '05:11:37',
+                    'jobname': 'name2',
                     'state': 'FAILED',
                     'nodelist': 'cpu-4',
                 },
@@ -197,12 +202,12 @@ class TestSAcct(TestCase):
         job ids that do not have dots should be processed.
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '1|COMPLETED|04:32:00|cpu-0\n'
-            '1.batch|COMPLETED|04:00:00|cpu-2\n'
-            '1.extern|COMPLETED|03:00:00|cpu-3\n'
-            '2.batch|FAILED|06:11:37|cpu-5\n'
-            '2|FAILED|05:11:37|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '1|name1|COMPLETED|04:32:00|cpu-0\n'
+            '1.batch|name1|COMPLETED|04:00:00|cpu-2\n'
+            '1.extern|name1|COMPLETED|03:00:00|cpu-3\n'
+            '2.batch|name2|FAILED|06:11:37|cpu-5\n'
+            '2|name2|FAILED|05:11:37|cpu-4\n'
         )
         sa = SAcct(
             {
@@ -215,11 +220,13 @@ class TestSAcct(TestCase):
             {
                 1: {
                     'elapsed': '04:32:00',
+                    'jobname': 'name1',
                     'state': 'COMPLETED',
                     'nodelist': 'cpu-0',
                 },
                 2: {
                     'elapsed': '05:11:37',
+                    'jobname': 'name2',
                     'state': 'FAILED',
                     'nodelist': 'cpu-4',
                 },
@@ -233,10 +240,10 @@ class TestSAcct(TestCase):
         It must be possible to get a summary of a job's status.
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '1|COMPLETED|04:32:00|cpu-3\n'
-            '2|FAILED|05:11:37|cpu-4\n'
-            '3|FINISHED|05:13:00|cpu-6\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '1|name|COMPLETED|04:32:00|cpu-3\n'
+            '2|name|FAILED|05:11:37|cpu-4\n'
+            '3|name|FINISHED|05:13:00|cpu-6\n'
         )
         sa = SAcct(
             {
@@ -245,12 +252,15 @@ class TestSAcct(TestCase):
                 'steps': [],
             },
             {1, 2, 3})
-        self.assertEqual('State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3',
-                         sa.summarize(1))
-        self.assertEqual('State=FAILED, Elapsed=05:11:37, Nodelist=cpu-4',
-                         sa.summarize(2))
-        self.assertEqual('State=FINISHED, Elapsed=05:13:00, Nodelist=cpu-6',
-                         sa.summarize(3))
+        self.assertEqual(
+            'JobName=name, State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3',
+            sa.summarize(1))
+        self.assertEqual(
+            'JobName=name, State=FAILED, Elapsed=05:11:37, Nodelist=cpu-4',
+            sa.summarize(2))
+        self.assertEqual(
+            'JobName=name, State=FINISHED, Elapsed=05:13:00, Nodelist=cpu-6',
+            sa.summarize(3))
 
     @patch('subprocess.check_output')
     def testSummarizePreservesFieldNameCase(self, subprocessMock):
@@ -279,9 +289,9 @@ class TestSAcct(TestCase):
         The 'finished' method must function as expected.
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '1|RUNNING|04:32:00|(none)\n'
-            '2|FAILED|05:11:37|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '1|name|RUNNING|04:32:00|(none)\n'
+            '2|name|FAILED|05:11:37|cpu-4\n'
         )
         sa = SAcct(
             {
@@ -299,9 +309,9 @@ class TestSAcct(TestCase):
         The 'failed' method must function as expected.
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '1|COMPLETED|04:32:00|(none)\n'
-            '2|FAILED|05:11:37|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '1|name|COMPLETED|04:32:00|(none)\n'
+            '2|name|FAILED|05:11:37|cpu-4\n'
         )
         sa = SAcct(
             {
@@ -319,9 +329,9 @@ class TestSAcct(TestCase):
         The 'completed' method must function as expected.
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '1|RUNNING|04:32:00|(none)\n'
-            '2|COMPLETED|05:11:37|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '1|name|RUNNING|04:32:00|(none)\n'
+            '2|name|COMPLETED|05:11:37|cpu-4\n'
         )
         sa = SAcct(
             {
@@ -339,9 +349,9 @@ class TestSAcct(TestCase):
         The 'state' method must function as expected.
         """
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '1|RUNNING|04:32:00|(none)\n'
-            '2|COMPLETED|05:11:37|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '1|name|RUNNING|04:32:00|(none)\n'
+            '2|name|COMPLETED|05:11:37|cpu-4\n'
         )
         sa = SAcct(
             {

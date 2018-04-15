@@ -19,7 +19,7 @@ class SAcct(object):
         sacct for the full list of possible field names.
     """
 
-    DEFAULT_FIELD_NAMES = 'State,Elapsed,Nodelist'
+    DEFAULT_FIELD_NAMES = 'JobName,State,Elapsed,Nodelist'
 
     def __init__(self, specification, jobIdsOfInterest, fieldNames=None):
         self.fieldNames = (fieldNames or environ.get('SP_STATUS_FIELD_NAMES')

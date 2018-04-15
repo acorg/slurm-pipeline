@@ -63,7 +63,7 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -109,16 +109,16 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '0|RUNNING|04:32:00|cpu-3\n'
-            '1|RUNNING|04:32:00|cpu-3\n'
-            '2|RUNNING|04:32:00|cpu-3\n'
-            '3|RUNNING|04:32:00|cpu-3\n'
-            '4|RUNNING|04:32:00|cpu-3\n'
-            '5|RUNNING|04:32:00|cpu-3\n'
-            '6|RUNNING|04:32:00|cpu-3\n'
-            '7|RUNNING|04:32:00|cpu-3\n'
-            '8|RUNNING|04:32:00|cpu-3\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '0|name|RUNNING|04:32:00|cpu-3\n'
+            '1|name|RUNNING|04:32:00|cpu-3\n'
+            '2|name|RUNNING|04:32:00|cpu-3\n'
+            '3|name|RUNNING|04:32:00|cpu-3\n'
+            '4|name|RUNNING|04:32:00|cpu-3\n'
+            '5|name|RUNNING|04:32:00|cpu-3\n'
+            '6|name|RUNNING|04:32:00|cpu-3\n'
+            '7|name|RUNNING|04:32:00|cpu-3\n'
+            '8|name|RUNNING|04:32:00|cpu-3\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -165,16 +165,16 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '0|RUNNING|04:32:00|cpu-3\n'
-            '1|RUNNING|04:32:00|cpu-3\n'
-            '2|RUNNING|04:32:00|cpu-3\n'
-            '3|RUNNING|04:32:00|cpu-3\n'
-            '4|RUNNING|04:32:00|cpu-3\n'
-            '5|RUNNING|04:32:00|cpu-3\n'
-            '6|RUNNING|04:32:00|cpu-3\n'
-            '7|RUNNING|04:32:00|cpu-3\n'
-            '8|RUNNING|04:32:00|cpu-3\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '0|name|RUNNING|04:32:00|cpu-3\n'
+            '1|name|RUNNING|04:32:00|cpu-3\n'
+            '2|name|RUNNING|04:32:00|cpu-3\n'
+            '3|name|RUNNING|04:32:00|cpu-3\n'
+            '4|name|RUNNING|04:32:00|cpu-3\n'
+            '5|name|RUNNING|04:32:00|cpu-3\n'
+            '6|name|RUNNING|04:32:00|cpu-3\n'
+            '7|name|RUNNING|04:32:00|cpu-3\n'
+            '8|name|RUNNING|04:32:00|cpu-3\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -207,7 +207,7 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -241,9 +241,9 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '34|RUNNING|04:32:00|cpu-3\n'
-            '35|RUNNING|04:32:00|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '34|name|RUNNING|04:32:00|cpu-3\n'
+            '35|name|RUNNING|04:32:00|cpu-4\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -277,9 +277,9 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '34|RUNNING|04:32:00|cpu-3\n'
-            '35|COMPLETED|04:32:00|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '34|name|RUNNING|04:32:00|cpu-3\n'
+            '35|name|COMPLETED|04:32:00|cpu-4\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -313,9 +313,9 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '34|COMPLETED|04:32:00|cpu-3\n'
-            '35|COMPLETED|04:32:00|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '34|name|COMPLETED|04:32:00|cpu-3\n'
+            '35|name|COMPLETED|04:32:00|cpu-4\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -347,7 +347,7 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -381,8 +381,8 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '123|RUNNING|04:32:00|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '123|name|RUNNING|04:32:00|cpu-4\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -416,8 +416,8 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '123|COMPLETED|04:32:00|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '123|name|COMPLETED|04:32:00|cpu-4\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -461,12 +461,12 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '12|RUNNING|04:32:00|cpu-3\n'
-            '34|COMPLETED|04:32:00|cpu-3\n'
-            '56|RUNNING|04:32:00|cpu-4\n'
-            '78|COMPLETED|04:32:00|cpu-4\n'
-            '90|RUNNING|04:32:00|cpu-5\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '12|name|RUNNING|04:32:00|cpu-3\n'
+            '34|name|COMPLETED|04:32:00|cpu-3\n'
+            '56|name|RUNNING|04:32:00|cpu-4\n'
+            '78|name|COMPLETED|04:32:00|cpu-4\n'
+            '90|name|RUNNING|04:32:00|cpu-5\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -498,7 +498,7 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -532,8 +532,8 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '123|COMPLETED|04:32:00|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '123|name|COMPLETED|04:32:00|cpu-4\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -567,8 +567,8 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '123|RUNNING|04:32:00|cpu-4\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '123|name|RUNNING|04:32:00|cpu-4\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -612,12 +612,12 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '12|RUNNING|04:32:00|cpu-3\n'
-            '34|COMPLETED|04:32:00|cpu-3\n'
-            '56|RUNNING|04:32:00|cpu-4\n'
-            '78|COMPLETED|04:32:00|cpu-4\n'
-            '90|RUNNING|04:32:00|cpu-5\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '12|name|RUNNING|04:32:00|cpu-3\n'
+            '34|name|COMPLETED|04:32:00|cpu-3\n'
+            '56|name|RUNNING|04:32:00|cpu-4\n'
+            '78|name|COMPLETED|04:32:00|cpu-4\n'
+            '90|name|RUNNING|04:32:00|cpu-5\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -656,7 +656,7 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -699,12 +699,12 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '12|RUNNING|04:32:00|cpu-3\n'
-            '34|COMPLETED|04:32:00|cpu-3\n'
-            '56|RUNNING|04:32:00|cpu-4\n'
-            '78|COMPLETED|04:32:00|cpu-4\n'
-            '90|RUNNING|04:32:00|cpu-5\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '12|name|RUNNING|04:32:00|cpu-3\n'
+            '34|name|COMPLETED|04:32:00|cpu-3\n'
+            '56|name|RUNNING|04:32:00|cpu-4\n'
+            '78|name|COMPLETED|04:32:00|cpu-4\n'
+            '90|name|RUNNING|04:32:00|cpu-5\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -859,12 +859,12 @@ class TestSlurmPipelineStatus(TestCase):
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '4416231|COMPLETED|04:32:00|cpu-3\n'
-            '4416232|COMPLETED|04:02:00|cpu-6\n'
-            '4416233|COMPLETED|04:12:00|cpu-7\n'
-            '4417615|COMPLETED|04:11:00|cpu-8\n'
-            '4417616|RUNNING|04:32:00|cpu-3\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '4416231|name1|COMPLETED|04:32:00|cpu-3\n'
+            '4416232|name2|COMPLETED|04:02:00|cpu-6\n'
+            '4416233|name3|COMPLETED|04:12:00|cpu-7\n'
+            '4417615|name5|COMPLETED|04:11:00|cpu-8\n'
+            '4417616|name6|RUNNING|04:32:00|cpu-3\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -932,11 +932,14 @@ Step 3: blastn
     Summary: 3 jobs started by these tasks, of which 3 (100.00%) are finished
     Tasks:
       chunk-aaaaa
-        Job 4416231: State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
+        Job 4416231: JobName=name1, State=COMPLETED, Elapsed=04:32:00, \
+Nodelist=cpu-3
       chunk-aaaab
-        Job 4416232: State=COMPLETED, Elapsed=04:02:00, Nodelist=cpu-6
+        Job 4416232: JobName=name2, State=COMPLETED, Elapsed=04:02:00, \
+Nodelist=cpu-6
       chunk-aaaac
-        Job 4416233: State=COMPLETED, Elapsed=04:12:00, Nodelist=cpu-7
+        Job 4416233: JobName=name3, State=COMPLETED, Elapsed=04:12:00, \
+Nodelist=cpu-7
   Collect step: False
   Working directory: 02-blastn
   Scheduled at: 2016-12-10 14:22:02
@@ -953,16 +956,20 @@ Step 4: panel
 finished
     Dependent tasks:
       chunk-aaaaa
-        Job 4416231: State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
+        Job 4416231: JobName=name1, State=COMPLETED, Elapsed=04:32:00, \
+Nodelist=cpu-3
       chunk-aaaab
-        Job 4416232: State=COMPLETED, Elapsed=04:02:00, Nodelist=cpu-6
+        Job 4416232: JobName=name2, State=COMPLETED, Elapsed=04:02:00, \
+Nodelist=cpu-6
       chunk-aaaac
-        Job 4416233: State=COMPLETED, Elapsed=04:12:00, Nodelist=cpu-7
+        Job 4416233: JobName=name3, State=COMPLETED, Elapsed=04:12:00, \
+Nodelist=cpu-7
   1 task emitted by this step
     Summary: 1 job started by this task, of which 1 (100.00%) are finished
     Tasks:
       panel
-        Job 4417615: State=COMPLETED, Elapsed=04:11:00, Nodelist=cpu-8
+        Job 4417615: JobName=name5, State=COMPLETED, Elapsed=04:11:00, \
+Nodelist=cpu-8
   Collect step: True
   Working directory: 03-panel
   Scheduled at: 2016-12-10 14:22:02
@@ -979,12 +986,14 @@ Step 5: stop
 finished
     Dependent tasks:
       panel
-        Job 4417615: State=COMPLETED, Elapsed=04:11:00, Nodelist=cpu-8
+        Job 4417615: JobName=name5, State=COMPLETED, Elapsed=04:11:00, \
+Nodelist=cpu-8
   1 task emitted by this step
     Summary: 1 job started by this task, of which 0 (0.00%) are finished
     Tasks:
       stop
-        Job 4417616: State=RUNNING, Elapsed=04:32:00, Nodelist=cpu-3
+        Job 4417616: JobName=name6, State=RUNNING, Elapsed=04:32:00, \
+Nodelist=cpu-3
   Collect step: False
   Working directory: 04-stop
   Scheduled at: 2016-12-10 14:22:02
@@ -1033,9 +1042,9 @@ finished
         }
 
         subprocessMock.return_value = (
-            'JobID|State|Elapsed|Nodelist\n'
-            '34|RUNNING|01:32:00|cpu-2\n'
-            '56|COMPLETED|04:32:00|cpu-3\n'
+            'JobID|JobName|State|Elapsed|Nodelist\n'
+            '34|name1|RUNNING|01:32:00|cpu-2\n'
+            '56|name2|COMPLETED|04:32:00|cpu-3\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -1052,8 +1061,8 @@ Scheduling arguments:
   Script arguments: hey you
   Skip: start-step
   Start after the following 2 jobs, of which 1 (50.00%) is finished:
-    Job 34: State=RUNNING, Elapsed=01:32:00, Nodelist=cpu-2
-    Job 56: State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
+    Job 34: JobName=name1, State=RUNNING, Elapsed=01:32:00, Nodelist=cpu-2
+    Job 56: JobName=name2, State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
 Steps summary:
   Number of steps: 1
   Jobs emitted in total: 0

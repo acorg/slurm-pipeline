@@ -452,7 +452,7 @@ Step 1: sleep
     Summary: 1 job started by this task, of which 1 (100.00%) are finished
     Tasks:
       sleep
-        Job 1349824: State=COMPLETED, Elapsed=00:00:46, Nodelist=cpu-e-131
+        Job 1349824: JobName=sleep, State=COMPLETED, Elapsed=00:00:46, Nodelist=cpu-e-131
   Collect step: False
   Working directory: 01-sleep
   Scheduled at: 2018-04-15 21:20:23
@@ -471,16 +471,16 @@ Step 2: multisleep
     Summary: 1 job started by the dependent task, of which 1 (100.00%) are finished
     Dependent tasks:
       sleep
-        Job 1349824: State=COMPLETED, Elapsed=00:00:46, Nodelist=cpu-e-131
+        Job 1349824: JobName=sleep, State=COMPLETED, Elapsed=00:00:46, Nodelist=cpu-e-131
   3 tasks emitted by this step
     Summary: 3 jobs started by these tasks, of which 3 (100.00%) are finished
     Tasks:
       sleep-0
-        Job 1349825: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+        Job 1349825: JobName=multisleep, State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
       sleep-1
-        Job 1349826: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+        Job 1349826: JobName=multisleep, State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
       sleep-2
-        Job 1349827: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+        Job 1349827: JobName=multisleep, State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
   Collect step: False
   Working directory: 02-multisleep
   Scheduled at: 2018-04-15 21:20:23
@@ -500,16 +500,16 @@ Step 3: error
     Summary: 3 jobs started by the dependent task, of which 3 (100.00%) are finished
     Dependent tasks:
       sleep-0
-        Job 1349825: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+        Job 1349825: JobName=multisleep, State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
       sleep-1
-        Job 1349826: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+        Job 1349826: JobName=multisleep, State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
       sleep-2
-        Job 1349827: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+        Job 1349827: JobName=multisleep, State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
   1 task emitted by this step
     Summary: 1 job started by this task, of which 1 (100.00%) are finished
     Tasks:
       sleep
-        Job 1349828: State=CANCELLED, Elapsed=00:00:00, Nodelist=None assigned
+        Job 1349828: JobName=error, State=CANCELLED, Elapsed=00:00:00, Nodelist=None assigned
   Collect step: True
   Working directory: 03-error
   Scheduled at: 2018-04-15 21:20:23
