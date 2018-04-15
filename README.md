@@ -6,7 +6,7 @@ A [Python](https://www.python.org) class for scheduling and examining
 
 Runs under Python 2.7, 3.5, 3.6, 3.7-dev, and [pypy](http://pypy.org/)
 [Change log](CHANGELOG.md).
-![travis](https://travis-ci.org/acorg/slurm-pipeline.svg?branch=master)
+[![Build Status](https://travis-ci.org/acorg/slurm-pipeline.svg?branch=master)](https://travis-ci.org/acorg/slurm-pipeline)
 
 Funding for the development of this package comes from the European Union
 Horizon 2020 research and innovation programme,
