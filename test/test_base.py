@@ -53,8 +53,7 @@ class TestSlurmPipelineBase(TestCase):
                          'quotes: line 1 column 2 \(char 1\)$')
             elif PYPY:
                 # The error message in the exception has a NUL in it.
-                error = ("^No JSON object could be decoded: unexpected "
-                         "'\\000' at char 0$")
+                error = "^Key name must be string at char 1$"
             else:
                 error = '^Expecting object: line 1 column 1 \(char 0\)$'
             assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
@@ -129,6 +128,40 @@ class TestSlurmPipelineBase(TestCase):
                                   },
                                   {
                                       'name': 'name2',
+                                  },
+                              ]
+                          })
+
+    def testSkipNotAList(self):
+        """
+        If the specification contains a step skip list that is not a list,
+        a SpecificationError must be raised.
+        """
+        error = "^The 'skip' key must be a list$"
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
+                          {
+                              'skip': 'xxx',
+                              'steps': [
+                                  {
+                                      'name': 'name1',
+                                      'script': 'script',
+                                  },
+                              ]
+                          })
+
+    def testSkipUnknownStep(self):
+        """
+        If the specification contains a step skip list that mentions a step
+        that does not exist, a SpecificationError must be raised.
+        """
+        error = "^The 'skip' key mentions a non-existent step, 'xxx'$"
+        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
+                          {
+                              'skip': ['xxx'],
+                              'steps': [
+                                  {
+                                      'name': 'name1',
+                                      'script': 'script',
                                   },
                               ]
                           })
@@ -330,7 +363,7 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         spb = SlurmPipelineBase(specification)
-        self.assertEqual(set(('name1',)), spb.finalSteps(spb.specification))
+        self.assertEqual(set(('name1',)), spb.finalSteps())
 
     def testFinalStepsWithTwoSteps(self):
         """
@@ -350,8 +383,7 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         spb = SlurmPipelineBase(specification)
-        self.assertEqual(set(('name1', 'name2')),
-                         spb.finalSteps(spb.specification))
+        self.assertEqual(set(('name1', 'name2')), spb.finalSteps())
 
     def testFinalStepsWithTwoStepsOneDependency(self):
         """
@@ -372,7 +404,7 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         spb = SlurmPipelineBase(specification)
-        self.assertEqual(set(('name2',)), spb.finalSteps(spb.specification))
+        self.assertEqual(set(('name2',)), spb.finalSteps())
 
     def testFinalStepsWithFiveSteps(self):
         """
@@ -406,8 +438,7 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         spb = SlurmPipelineBase(specification)
-        self.assertEqual(set(('name2', 'name5')),
-                         spb.finalSteps(spb.specification))
+        self.assertEqual(set(('name2', 'name5')), spb.finalSteps())
 
     def testFinalStepsWithSixSteps(self):
         """
@@ -446,4 +477,4 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         spb = SlurmPipelineBase(specification)
-        self.assertEqual(set(('name6',)), spb.finalSteps(spb.specification))
+        self.assertEqual(set(('name6',)), spb.finalSteps())

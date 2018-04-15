@@ -2,9 +2,9 @@
 
 """
 Use the SlurmPipeline class to schedule the running of a pipeline job from its
-specification, printing (to stdout) a detailed specification that includes job
-ids. The status can be saved to a file and later given to
-slurm-pipeline-status.py to monitor job progress.
+specification, printing (to stdout or to the file named by --output) a detailed
+specification that includes job ids. The printed status can be saved to a file
+and later given to slurm-pipeline-status.py to monitor job progress.
 """
 
 from __future__ import print_function
@@ -12,7 +12,6 @@ from __future__ import print_function
 import sys
 import os
 import argparse
-from tempfile import mkstemp
 
 from slurm_pipeline import SlurmPipeline
 
@@ -33,7 +32,7 @@ parser.add_argument(
 
 parser.add_argument(
     '--firstStep', metavar='step-name',
-    help=('The name of the first specification step to execute. Earlier '
+    help=('The name of the first pipeline step to execute. Earlier '
           'steps will actually be executed but they will have SP_SIMULATE=1 '
           'in their environment, allowing them to skip doing actual work '
           '(while still emitting task names without job numbers so that '
@@ -41,13 +40,13 @@ parser.add_argument(
 
 parser.add_argument(
     '--lastStep', metavar='step-name',
-    help=('The name of the last specification step to execute. See the '
+    help=('The name of the last pipeline step to execute. See the '
           'help text for --first-step for how this affects the environment '
           'in which step scripts are executed.'))
 
 parser.add_argument(
     '--skip', metavar='step-name', action='append',
-    help='Name a step that should be skipped. May be repeated.')
+    help='Name a pipeline step that should be skipped. May be repeated.')
 
 parser.add_argument(
     '--sleep', type=float, default=0.0,
@@ -61,7 +60,7 @@ parser.add_argument(
     '--startAfter', nargs='*',
     help=('Give a list of SLURM job ids that must complete (in any state - '
           'either successfully or in error) before the initial step(s), '
-          'i.e., those with no dependencies, in the current specification may '
+          'i.e., those with no dependencies, in the current pipeline may '
           'begin.'))
 
 parser.add_argument(
@@ -69,6 +68,12 @@ parser.add_argument(
     help=('A numeric nice (priority) value, in the range -10000 (highest '
           'priority) to 10000 (lowest priority). Note that only privileged '
           'users can specify a negative adjustment.'))
+
+parser.add_argument(
+    '--output', '-o', default=sys.stdout,
+    type=argparse.FileType('w'), nargs='?',
+    help=('The name of the file to write the pipeline status to (in JSON '
+          'format). Default is standard output.'))
 
 args, scriptArgs = parser.parse_known_args()
 
@@ -83,13 +88,15 @@ status = sp.schedule(
 
 statusAsJSON = sp.specificationToJSON(status)
 
-print(statusAsJSON)
+print(statusAsJSON, file=args.output)
 
-# If the user forgot to redirect output to a file, save it to a tempfile
-# for them and let them know where it is. We do this because without the
-# status they will have no way to examine the job with
-# slurm-pipeline-status.py
-if os.isatty(1):
+
+# If the user did not redirect output to a file or specify an output file,
+# save the status to a tempfile for them and let them know where it is. We
+# do this because without the status they will have no way to examine the
+# job with slurm-pipeline-status.py
+if os.isatty(1) and args.output is sys.stdout:
+    from tempfile import mkstemp
     fd, filename = mkstemp(prefix='slurm-pipeline-status-', suffix='.json')
     print('WARNING: You did not save stdout to a file, so I have '
           'saved the specification status to %r for you.' % filename,

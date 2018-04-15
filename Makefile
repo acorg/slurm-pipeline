@@ -1,4 +1,4 @@
-.PHONY: check, tcheck, examples-test, pep8, pyflakes, lint, wc, clean, clobber, upload
+.PHONY: check, tcheck, examples-test, pycodestyle, pyflakes, lint, wc, clean, clobber, upload
 
 check:
 	python -m discover -v
@@ -12,13 +12,13 @@ examples-test:
 	make -C examples/blast run clean
 	make -C examples/blast-with-force-and-simulate run clean
 
-pep8:
-	find . -path './.tox' -prune -o -path './build' -prune -o -path './dist' -prune -o -name '*.py' -print0 | xargs -0 pep8
+pycodestyle:
+	find . -path './.tox' -prune -o -path './build' -prune -o -path './dist' -prune -o -name '*.py' -print0 | xargs -0 pycodestyle
 
 pyflakes:
 	find .  -path './.tox' -prune -path './build' -prune -o -path './dist' -prune -o -name '*.py' -print0 | xargs -0 pyflakes
 
-lint: pep8 pyflakes
+lint: pycodestyle pyflakes
 
 wc:
 	find . -path './.tox' -prune -o -path './build' -prune -o -path './dist' -prune -o \( -name '*.py' -o -name '*.sh' \) -print0 | xargs -0 wc -l

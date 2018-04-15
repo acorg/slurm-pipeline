@@ -31,7 +31,7 @@ class SlurmPipelineBase(object):
     @staticmethod
     def checkSpecification(specification):
         """
-        Check an execution specification is syntactically as expected.
+        Check an execution specification is as expected.
 
         @param specification: A C{dict} containing an execution specification.
         @raise SpecificationError: if there is anything wrong with the
@@ -107,11 +107,14 @@ class SlurmPipelineBase(object):
                             'not-yet-defined) step: %r' %
                             (count, stepName, dependency))
 
-            else:
-                if 'error step' in step:
+        if 'skip' in specification:
+            if not isinstance(specification['skip'], list):
+                raise SpecificationError("The 'skip' key must be a list")
+            for stepName in specification['skip']:
+                if stepName not in stepNames:
                     raise SpecificationError(
-                        'Step %d (%r) is an error step but has no '
-                        "'dependencies' key" % (count, stepName))
+                        "The 'skip' key mentions a non-existent step, '%s'" %
+                        stepName)
 
     @staticmethod
     def _loadSpecification(specificationFile):
@@ -152,21 +155,19 @@ class SlurmPipelineBase(object):
         return dumps(specification, sort_keys=True, indent=2,
                      separators=(',', ': '))
 
-    @staticmethod
-    def finalSteps(specification):
+    def finalSteps(self):
         """
         Find the specification steps on which nothing depends. These are the
         the steps that must all finish before a specification has fully
         finished running.
 
-        @param specification: A specification C{dict}.
         @return: A C{set} of C{str} step names.
         """
         # This implementation is slightly inefficient, but is easy to
         # understand. It would be faster to just gather all step names that
         # appear in any step dependency and then return the set of all step
         # names minus that set.
-        steps = specification['steps']
+        steps = self.specification['steps']
         result = set()
         for stepName in steps:
             for step in steps.values():

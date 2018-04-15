@@ -1,0 +1,34 @@
+## Version 2.0.0 - April 15, 2018
+
+### sacct now used instead of squeue
+
+This change is not backward-compatible with earlier versions, hence the
+major version number change.
+
+* SLURM job status reporting was changed to use `sacct` rather than
+  `squeue` as a result of a pull request submitted by
+  [healther](https://github.com/healther).  This has the advantage of being
+  able to show status information for jobs that have completed.
+* The `squeueArgs` command line option to `slurm-pipeline.py` was removed.
+* A `fieldNames` argument was added to `slurm-pipeline-status.py`. This can
+  be used to specify what job fields you want to see in the summary
+  output. The default is `State`, `Elapsed`, and `Nodelist`. You can set
+  `SP_STATUS_FIELD_NAMES` to a comma-separated list of job fields to set
+  your own default preference.  See `man sacct` for the full list of field
+  names.
+
+Other changes
+
+* It is now possible to specify `error step: true` for a step that has no
+  dependencies. This used to be flagged as an error, but it makes sense to
+  allow it as the user might use `--startAfter` on the command line, and
+  the jobs which the no-dependency step is suppose to start after may fail.
+* The `Makefile` now uses `pycodestyle` instead of `pep8` to check Python
+  style (this is just a new name for the `pep8` tool).
+* An `--output` option was added to `slurm-pipeline.py` to allow the
+  specification of an output file for the JSON status. The default is to
+  print it to standard output.
+* `SP_DEPENDENCY_ARG` is now set for all steps that don't have dependencies
+  if `--startAfter` is used when invoking `slurm-pipeline.py`.
+* The all-step summary section of the `slurm-pipeline-status.py` output is
+  slightly improved, to list an overall count of jobs started and finished.

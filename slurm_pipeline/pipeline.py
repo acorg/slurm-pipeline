@@ -4,6 +4,7 @@ import re
 import time
 import subprocess
 from collections import defaultdict
+from os import getlogin
 
 try:
     from subprocess import DEVNULL  # py3k
@@ -20,11 +21,11 @@ class SlurmPipeline(SlurmPipelineBase):
     it via SLURM.
     """
 
-    # In script output, look for lines of the form
-    # TASK: NAME 297483 297485 297490
+    # In task script output, look for lines of the form
+    #   TASK: NAME 297483 297485 297490
     # containing a task name (with no spaces) followed by zero or more numeric
-    # job ids. The following regex just matches the first part of that.
-    TASK_NAME_LINE = re.compile('^TASK:\s+(\S+)\s*')
+    # job ids. The following regex just matches 'TASK' and the task name.
+    TASK_NAME_LINE = re.compile('^TASK:\s*(\S+)')
 
     # Limits on the --nice argument to sbatch. In later SLURM versions the
     # limits are +/-2147483645. See https://slurm.schedmd.com/sbatch.html
@@ -34,7 +35,7 @@ class SlurmPipeline(SlurmPipelineBase):
     @staticmethod
     def checkSpecification(specification):
         """
-        Check an execution specification is syntactically as expected.
+        Check an execution specification is as expected.
 
         @param specification: A C{dict} containing an execution specification.
         @raise SpecificationError: if there is anything wrong with the
@@ -117,15 +118,17 @@ class SlurmPipeline(SlurmPipelineBase):
         skip = set(skip or ())
         self._checkRuntime(steps, firstStep, lastStep, skip, nice)
         specification.update({
-            'force': force,
             'firstStep': firstStep,
+            'force': force,
             'lastStep': lastStep,
             'nice': nice,
             'scheduledAt': time.time(),
             'scriptArgs': scriptArgs,
             'skip': skip,
+            'sleep': sleep,
             'startAfter': startAfter,
             'steps': steps,
+            'user': getlogin(),
         })
 
         environ['SP_FORCE'] = str(int(force))
@@ -212,9 +215,10 @@ class SlurmPipeline(SlurmPipelineBase):
         if taskDependencies:
             if 'collect' in step:
                 # This step is a 'collector'. I.e., it is dependent on all
-                # tasks from all its dependencies and cannot run until they
-                # have all finished. We will only run the script once, and tell
-                # it about all job ids for all tasks that are depended on.
+                # tasks from all its dependent steps and cannot run until
+                # they have all finished. We will only run the script once,
+                # and tell it about all job ids for all tasks that are
+                # depended on.
                 env = environ.copy()
                 env['SP_ORIGINAL_ARGS'] = scriptArgsStr
                 env['SP_SIMULATE'] = str(int(simulate))
@@ -245,26 +249,26 @@ class SlurmPipeline(SlurmPipelineBase):
                     self._runStepScript(step, [taskName], env)
         else:
             # Either this step has no dependencies or the steps it is
-            # dependent on did not start any tasks. If there are no
-            # dependencies, run the script with the originally passed
-            # command line arguments (if any) and the --startAfter job
-            # dependencies (if any). If there were dependencies but no
-            # tasks have been started, run the step with no command line
-            # arguments.
-
+            # dependent on did not start any tasks.
             env = environ.copy()
-            if 'dependencies' in step:
-                args = []
-                env.pop('SP_DEPENDENCY_ARG', None)
+
+            if startAfter:
+                dependencies = separator.join(
+                    sorted(('%s:%d' % (after, jobId)) for jobId in startAfter))
+                env['SP_DEPENDENCY_ARG'] = '--dependency=' + dependencies
             else:
+                env.pop('SP_DEPENDENCY_ARG', None)
+
+            if 'dependencies' in step:
+                # The step has dependencies, but the dependent steps did
+                # not start any tasks. Run the step as though there were no
+                # dependencies.
+                args = []
+            else:
+                # The step has no dependencies. Run it with the original
+                # command line arguments and put any --startAfter job ids
+                # into the SP_DEPENDENCY_ARG environment variable.
                 args = [] if scriptArgs is None else list(map(str, scriptArgs))
-                if startAfter:
-                    dependencies = ','.join(
-                        sorted(('afterany:%d' % jobId)
-                               for jobId in startAfter))
-                    env['SP_DEPENDENCY_ARG'] = '--dependency=' + dependencies
-                else:
-                    env.pop('SP_DEPENDENCY_ARG', None)
 
             env['SP_ORIGINAL_ARGS'] = scriptArgsStr
             env['SP_SIMULATE'] = str(int(simulate))
@@ -312,12 +316,18 @@ class SlurmPipeline(SlurmPipelineBase):
             if match:
                 taskName = match.group(1)
                 # The job ids follow the 'TASK:' string and the task name.
-                # They should not contain duplicates.
-                jobIds = list(map(int, line.split()[2:]))
+                # If they contain duplicates we consider it an error.
+                try:
+                    jobIds = list(map(int, line[match.end(1):].split()))
+                except ValueError:
+                    raise SchedulingError(
+                        'Task name %r was output with non-numeric job ids by '
+                        '%r script in step named %r. Output line was %r' %
+                        (taskName, step['script'], step['name'], line))
                 if len(jobIds) != len(set(jobIds)):
                     raise SchedulingError(
-                        'Task name %r was output with a duplicate in its job '
-                        'ids %r by %r script in step named %r' %
+                        'Task name %r was output with a duplicate in its '
+                        'job ids %r by %r script in step named %r' %
                         (taskName, jobIds, step['script'], step['name']))
                 tasks[taskName].update(jobIds)
 
@@ -366,10 +376,6 @@ class SlurmPipeline(SlurmPipelineBase):
                         'Nice (priority) value %r is outside the allowed '
                         '[%d, %d] range' %
                         (nice, self.NICE_HIGHEST, self.NICE_LOWEST))
-
-        if lastStep is not None and lastStep not in steps:
-            raise SchedulingError(
-                'Last step %r not found in specification' % lastStep)
 
         for step in steps.values():
             if step['name'] == firstStep:
