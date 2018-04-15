@@ -428,106 +428,101 @@ $ slurm-pipeline.py --specification spec.json > status.json
 
 ```sh
 $ slurm-pipeline-status.py --specification status.json
-Scheduled by: sally
-Scheduled at: 2016-12-10 14:20:58
+Scheduled by: tcj25
+Scheduled at: 2018-04-15 21:20:23
 Scheduling arguments:
-  First step: panel
+  First step: None
   Force: False
   Last step: None
+  Nice: None
+  Sleep: 0.00
   Script arguments: <None>
   Skip: <None>
   Start after: <None>
 Steps summary:
-  Number of steps: 5
+  Number of steps: 3
   Jobs emitted in total: 5
-  Jobs finished: 4 (80.00%)
-    start: no jobs emitted
-    split: no jobs emitted
-    blastn: 3 jobs emitted, 3 (100.00%) finished
-    panel: 1 job emitted, 1 (100.00%) finished
-    stop: 1 job emitted, 0 (0.00%) finished
-Step 1: start
+  Jobs finished: 5 (100.00%)
+    sleep: 1 job emitted, 1 (100.00%) finished
+    multisleep: 3 jobs emitted, 3 (100.00%) finished
+    error: 1 job emitted, 1 (100.00%) finished
+Step 1: sleep
   No dependencies.
-  No tasks emitted by this step
-  Working directory: 00-start
-  Scheduled at: 2016-12-10 14:20:59
-  Script: 00-start/start.sh
-  Simulate: True
-  Skip: False
-Step 2: split
-  1 step dependency: start
-    Dependent on 0 tasks emitted by the dependent step
-  3 tasks emitted by this step
-    Summary: 0 jobs started by these tasks
-    Tasks:
-      chunk-aaaaa
-      chunk-aaaab
-      chunk-aaaac
-  Working directory: 01-split
-  Scheduled at: 2016-12-10 14:21:04
-  Script: 01-split/sbatch.sh
-  Simulate: True
-  Skip: False
-Step 3: blastn
-  1 step dependency: split
-    Dependent on 3 tasks emitted by the dependent step
-    Summary: 0 jobs started by the dependent tasks
-    Dependent tasks:
-      chunk-aaaaa
-      chunk-aaaab
-      chunk-aaaac
-  3 tasks emitted by this step
-    Summary: 3 jobs started by these tasks, of which 3 (100.00%) are finished
-    Tasks:
-      chunk-aaaaa
-        Job 4416231: State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
-      chunk-aaaab
-        Job 4416232: State=COMPLETED, Elapsed=04:02:00, Nodelist=cpu-6
-      chunk-aaaac
-        Job 4416233: State=COMPLETED, Elapsed=04:12:00, Nodelist=cpu-7
-  Working directory: 02-blastn
-  Scheduled at: 2016-12-10 14:22:02
-  Script: 02-blastn/sbatch.sh
-  Simulate: True
-  Skip: False
-Step 4: panel
-  1 step dependency: blastn
-    Dependent on 3 tasks emitted by the dependent step
-    Summary: 3 jobs started by the dependent tasks, of which 3 (100.00%) are finished
-    Dependent tasks:
-      chunk-aaaaa
-        Job 4416231: State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
-      chunk-aaaab
-        Job 4416232: State=COMPLETED, Elapsed=04:02:00, Nodelist=cpu-6
-      chunk-aaaac
-        Job 4416233: State=COMPLETED, Elapsed=04:12:00, Nodelist=cpu-7
   1 task emitted by this step
     Summary: 1 job started by this task, of which 1 (100.00%) are finished
     Tasks:
-      panel
-        Job 4417615: Finished
-  Working directory: 03-panel
-  Scheduled at: 2016-12-10 14:22:02
-  Script: 03-panel/sbatch.sh
+      sleep
+        Job 1349824: State=COMPLETED, Elapsed=00:00:46, Nodelist=cpu-e-131
+  Collect step: False
+  Working directory: 01-sleep
+  Scheduled at: 2018-04-15 21:20:23
+  Script: submit.sh
   Simulate: False
   Skip: False
-Step 5: stop
-  1 step dependency: panel
+  Slurm pipeline environment variables:
+    SP_FORCE: 0
+    SP_NICE_ARG: --nice
+    SP_ORIGINAL_ARGS:
+    SP_SIMULATE: 0
+    SP_SKIP: 0
+Step 2: multisleep
+  1 step dependency: sleep
     Dependent on 1 task emitted by the dependent step
     Summary: 1 job started by the dependent task, of which 1 (100.00%) are finished
     Dependent tasks:
-      panel
-        Job 4417615: State=COMPLETED, Elapsed=04:11:00, Nodelist=cpu-8
-  1 task emitted by this step
-    Summary: 1 job started by this task, of which 0 (0.00%) are finished
+      sleep
+        Job 1349824: State=COMPLETED, Elapsed=00:00:46, Nodelist=cpu-e-131
+  3 tasks emitted by this step
+    Summary: 3 jobs started by these tasks, of which 3 (100.00%) are finished
     Tasks:
-      stop
-        Job 4417616: State=RUNNING, Elapsed=04:32:00, Nodelist=cpu-3
-  Working directory: 04-stop
-  Scheduled at: 2016-12-10 14:22:02
-  Script: 04-stop/sbatch.sh
+      sleep-0
+        Job 1349825: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+      sleep-1
+        Job 1349826: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+      sleep-2
+        Job 1349827: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+  Collect step: False
+  Working directory: 02-multisleep
+  Scheduled at: 2018-04-15 21:20:23
+  Script: submit.sh
   Simulate: False
   Skip: False
+  Slurm pipeline environment variables:
+    SP_DEPENDENCY_ARG: --dependency=afterok:1349824
+    SP_FORCE: 0
+    SP_NICE_ARG: --nice
+    SP_ORIGINAL_ARGS:
+    SP_SIMULATE: 0
+    SP_SKIP: 0
+Step 3: error
+  1 step dependency: multisleep
+    Dependent on 3 tasks emitted by the dependent step
+    Summary: 3 jobs started by the dependent task, of which 3 (100.00%) are finished
+    Dependent tasks:
+      sleep-0
+        Job 1349825: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+      sleep-1
+        Job 1349826: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+      sleep-2
+        Job 1349827: State=COMPLETED, Elapsed=00:01:32, Nodelist=cpu-e-131
+  1 task emitted by this step
+    Summary: 1 job started by this task, of which 1 (100.00%) are finished
+    Tasks:
+      sleep
+        Job 1349828: State=CANCELLED, Elapsed=00:00:00, Nodelist=None assigned
+  Collect step: True
+  Working directory: 03-error
+  Scheduled at: 2018-04-15 21:20:23
+  Script: submit.sh
+  Simulate: False
+  Skip: False
+  Slurm pipeline environment variables:
+    SP_DEPENDENCY_ARG: --dependency=afternotok:1349825?afternotok:1349826?afternotok:1349827
+    SP_FORCE: 0
+    SP_NICE_ARG: --nice
+    SP_ORIGINAL_ARGS:
+    SP_SIMULATE: 0
+    SP_SKIP: 0
 ```
 
 ## Examples
