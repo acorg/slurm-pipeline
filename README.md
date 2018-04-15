@@ -458,7 +458,7 @@ Step 2: split
   1 step dependency: start
     Dependent on 0 tasks emitted by the dependent step
   3 tasks emitted by this step
-    0 jobs started by these tasks
+    Summary: 0 jobs started by these tasks
     Tasks:
       chunk-aaaaa
       chunk-aaaab
@@ -471,13 +471,13 @@ Step 2: split
 Step 3: blastn
   1 step dependency: split
     Dependent on 3 tasks emitted by the dependent step
-    0 jobs started by the dependent tasks
+    Summary: 0 jobs started by the dependent tasks
     Dependent tasks:
       chunk-aaaaa
       chunk-aaaab
       chunk-aaaac
   3 tasks emitted by this step
-    3 jobs started by this task, of which 3 (100.00%) are finished
+    Summary: 3 jobs started by these tasks, of which 3 (100.00%) are finished
     Tasks:
       chunk-aaaaa
         Job 4416231: State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
@@ -493,7 +493,7 @@ Step 3: blastn
 Step 4: panel
   1 step dependency: blastn
     Dependent on 3 tasks emitted by the dependent step
-    3 jobs started by the dependent task, of which 3 (100.00%) are finished
+    Summary: 3 jobs started by the dependent tasks, of which 3 (100.00%) are finished
     Dependent tasks:
       chunk-aaaaa
         Job 4416231: State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
@@ -502,7 +502,7 @@ Step 4: panel
       chunk-aaaac
         Job 4416233: State=COMPLETED, Elapsed=04:12:00, Nodelist=cpu-7
   1 task emitted by this step
-    1 job started by this task, of which 1 (100.00%) are finished
+    Summary: 1 job started by this task, of which 1 (100.00%) are finished
     Tasks:
       panel
         Job 4417615: Finished
@@ -514,12 +514,12 @@ Step 4: panel
 Step 5: stop
   1 step dependency: panel
     Dependent on 1 task emitted by the dependent step
-    1 job started by the dependent task, of which 1 (100.00%) are finished
+    Summary: 1 job started by the dependent task, of which 1 (100.00%) are finished
     Dependent tasks:
       panel
         Job 4417615: State=COMPLETED, Elapsed=04:11:00, Nodelist=cpu-8
   1 task emitted by this step
-    1 job started by this task, of which 0 (0.00%) are finished
+    Summary: 1 job started by this task, of which 0 (0.00%) are finished
     Tasks:
       stop
         Job 4417616: State=RUNNING, Elapsed=04:32:00, Nodelist=cpu-3
