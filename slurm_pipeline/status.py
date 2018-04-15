@@ -156,16 +156,16 @@ class SlurmPipelineStatus(SlurmPipelineBase):
 
             if jobIdsCount:
                 append(
-                    '    %d job%s started by the dependent task%s, of '
-                    'which %d (%.2f%%) are finished' %
+                    '    Summary: %d job%s started by the dependent task%s, '
+                    'of which %d (%.2f%%) are finished' %
                     (jobIdsCount, '' if jobIdsCount == 1 else 's',
-                     '' if dependencyCount else 's',
+                     '' if dependencyCount == 1 else 's',
                      jobIdsFinishedCount,
                      100.0 if jobIdsCount == 0 else
                      (jobIdsFinishedCount / jobIdsCount * 100.0)))
             elif taskDependencyCount:
-                append('    0 jobs started by the dependent task%s' % (
-                    '' if taskDependencyCount == 1 else 's'))
+                append('    Summary: 0 jobs started by the dependent '
+                       'task%s' % ('' if taskDependencyCount == 1 else 's'))
 
             if taskDependencyCount:
                 append('    Dependent tasks:')
@@ -195,15 +195,15 @@ class SlurmPipelineStatus(SlurmPipelineBase):
 
             if jobIdsCount:
                 append(
-                    '    %d job%s started by %s, of which %d (%.2f%%) '
-                    'are finished' %
+                    '    Summary: %d job%s started by %s, of which %d '
+                    '(%.2f%%) are finished' %
                     (jobIdsCount, '' if jobIdsCount == 1 else 's',
-                     'this task' if taskCount else 'these tasks',
+                     'this task' if taskCount == 1 else 'these tasks',
                      jobIdsFinishedCount,
                      100.0 if jobIdsCount == 0 else
                      jobIdsFinishedCount / jobIdsCount * 100.0))
             else:
-                append('    0 jobs started by %s' %
+                append('    Summary: 0 jobs started by %s' %
                        ('this task' if taskCount == 1 else 'these tasks'))
 
             if taskCount:
