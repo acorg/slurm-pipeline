@@ -281,6 +281,82 @@ class TestSlurmPipeline(TestCase):
     @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
+    def testTaskNameNotPrecededBySpace(self, existsMock, accessMock,
+                                       subprocessMock):
+        """
+        If a step script outputs a task name that does not have a space before
+        it, the job ids it prints must still be collected correctly.
+        """
+        subprocessMock.return_value = 'TASK:xxx 123 456\n'
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        specification = sp.schedule()
+        self.assertEqual(
+            {
+                'xxx': {123, 456},
+            },
+            specification['steps']['name1']['tasks'])
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testTaskOutputFollowedBySpace(self, existsMock, accessMock,
+                                      subprocessMock):
+        """
+        If a step script outputs a task line that has trailing space, the job
+        ids it prints must still be collected correctly.
+        """
+        subprocessMock.return_value = 'TASK: xxx 123  \n'
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        specification = sp.schedule()
+        self.assertEqual(
+            {
+                'xxx': {123},
+            },
+            specification['steps']['name1']['tasks'])
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testTaskOutputFollowedByNonNumber(self, existsMock, accessMock,
+                                          subprocessMock):
+        """
+        If a step script outputs a task line that has trailing non-numeric
+        text, a SchedulingError must be raised.
+        """
+        subprocessMock.return_value = 'TASK: xxx 123 hello\n'
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+        error = ("^Task name 'xxx' was output with non-numeric job ids by "
+                 "'script1' script in step named 'name1'. Output line was "
+                 "'TASK: xxx 123 hello'$")
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule)
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
     def testRepeatedTaskName(self, existsMock, accessMock, subprocessMock):
         """
         If a step script outputs a duplicated task name, the job ids
@@ -1585,6 +1661,7 @@ class TestSlurmPipeline(TestCase):
                 'scheduledAt': 10.0,
                 'scriptArgs': None,
                 'skip': [],
+                'sleep': 0.0,
                 'startAfter': None,
                 'steps': [
                     {

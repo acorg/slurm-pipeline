@@ -291,6 +291,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         append = result.append
 
         append('  Nice: %s' % specification.get('nice', '<None>'))
+        append('  Sleep: %.2f' % specification.get('sleep', 0.0))
 
         if specification['scriptArgs']:
             append('  Script arguments: %s' %
@@ -304,8 +305,19 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             append('  Skip: <None>')
 
         if specification['startAfter']:
-            append('  Start after: %s' % ', '.join(
-                map(str, specification['startAfter'])))
+            startAfter = specification['startAfter']
+            nStartAfter = len(startAfter)
+            finishedCount = len([
+                jobId for jobId in startAfter if self.sacct.finished(jobId)])
+            percent = finishedCount / nStartAfter * 100.0
+
+            append(
+                '  Start after the following %d job%s, of which %d (%.2f%%) '
+                '%s finished:' %
+                (nStartAfter, '' if nStartAfter == 1 else 's', finishedCount,
+                 percent, 'is' if finishedCount == 1 else 'are'))
+            for jobId in startAfter:
+                append('    Job %d: %s' % (jobId, self.sacct.summarize(jobId)))
         else:
             append('  Start after: <None>')
 

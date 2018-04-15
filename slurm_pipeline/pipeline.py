@@ -21,11 +21,11 @@ class SlurmPipeline(SlurmPipelineBase):
     it via SLURM.
     """
 
-    # In script output, look for lines of the form
-    # TASK: NAME 297483 297485 297490
+    # In task script output, look for lines of the form
+    #   TASK: NAME 297483 297485 297490
     # containing a task name (with no spaces) followed by zero or more numeric
-    # job ids. The following regex just matches the first part of that.
-    TASK_NAME_LINE = re.compile('^TASK:\s+(\S+)\s*')
+    # job ids. The following regex just matches 'TASK' and the task name.
+    TASK_NAME_LINE = re.compile('^TASK:\s*(\S+)')
 
     # Limits on the --nice argument to sbatch. In later SLURM versions the
     # limits are +/-2147483645. See https://slurm.schedmd.com/sbatch.html
@@ -125,6 +125,7 @@ class SlurmPipeline(SlurmPipelineBase):
             'scheduledAt': time.time(),
             'scriptArgs': scriptArgs,
             'skip': skip,
+            'sleep': sleep,
             'startAfter': startAfter,
             'steps': steps,
             'user': getlogin(),
@@ -315,12 +316,18 @@ class SlurmPipeline(SlurmPipelineBase):
             if match:
                 taskName = match.group(1)
                 # The job ids follow the 'TASK:' string and the task name.
-                # They should not contain duplicates.
-                jobIds = list(map(int, line.split()[2:]))
+                # If they contain duplicates we consider it an error.
+                try:
+                    jobIds = list(map(int, line[match.end(1):].split()))
+                except ValueError:
+                    raise SchedulingError(
+                        'Task name %r was output with non-numeric job ids by '
+                        '%r script in step named %r. Output line was %r' %
+                        (taskName, step['script'], step['name'], line))
                 if len(jobIds) != len(set(jobIds)):
                     raise SchedulingError(
-                        'Task name %r was output with a duplicate in its job '
-                        'ids %r by %r script in step named %r' %
+                        'Task name %r was output with a duplicate in its '
+                        'job ids %r by %r script in step named %r' %
                         (taskName, jobIds, step['script'], step['name']))
                 tasks[taskName].update(jobIds)
 

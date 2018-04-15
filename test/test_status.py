@@ -858,6 +858,7 @@ Scheduling arguments:
   Force: False
   Last step: None
   Nice: 3
+  Sleep: 0.00
   Script arguments: <None>
   Skip: <None>
   Start after: <None>
@@ -969,6 +970,7 @@ Step 5: stop
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': ['hey', 'you'],
             'skip': ['start-step'],
+            'sleep': 5.0,
             'startAfter': [34, 56],
             'steps': [
                 {
@@ -987,8 +989,8 @@ Step 5: stop
 
         subprocessMock.return_value = (
             'JobID|State|Elapsed|Nodelist\n'
-            '34|RUNNING|04:32:00|cpu-3\n'
-            '56|RUNNING|04:32:00|cpu-3\n'
+            '34|RUNNING|01:32:00|cpu-2\n'
+            '56|COMPLETED|04:32:00|cpu-3\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -1001,9 +1003,12 @@ Scheduling arguments:
   Force: False
   Last step: None
   Nice: None
+  Sleep: 5.00
   Script arguments: hey you
   Skip: start-step
-  Start after: 34, 56
+  Start after the following 2 jobs, of which 1 (50.00%) is finished:
+    Job 34: State=RUNNING, Elapsed=01:32:00, Nodelist=cpu-2
+    Job 56: State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
 Steps summary:
   Number of steps: 1
   Jobs emitted in total: 0
