@@ -1,5 +1,4 @@
 from os import X_OK, path
-from os import getlogin
 from unittest import TestCase
 from six import assertRaisesRegex
 from json import dumps
@@ -9,6 +8,8 @@ from sys import version_info
 
 from slurm_pipeline.pipeline import SlurmPipeline, DEVNULL
 from slurm_pipeline.error import SchedulingError, SpecificationError
+from slurm_pipeline.utils import getlogin
+
 
 try:
     from unittest.mock import ANY, call, patch

@@ -44,4 +44,7 @@ setup(name='slurm-pipeline',
           'Topic :: Software Development :: Libraries :: Python Modules',
       ],
       license='MIT',
+      install_requires=[
+          'six>=1.10.0',
+      ],
       description='A Python class for scheduling SLURM jobs')

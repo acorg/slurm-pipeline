@@ -4,8 +4,9 @@ A [Python](https://www.python.org) class for scheduling and examining
 [SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
-Runs under Python 2.7, 3.5, 3.6, and [pypy](http://pypy.org/) 5.10.0.
+Runs under Python 2.7, 3.5, 3.6, 3.7-dev, and [pypy](http://pypy.org/)
 [Change log](CHANGELOG.md).
+![travis](https://travis-ci.org/acorg/slurm-pipeline.svg?branch=master)
 
 Funding for the development of this package comes from the European Union
 Horizon 2020 research and innovation programme,
@@ -32,9 +33,8 @@ Using [git](https://git-scm.com/downloads):
 $ git clone https://github.com/acorg/slurm-pipeline
 $ cd slurm-pipeline
 
-# Install dependencies: requirements-2.txt for Python 2, requirements-3.txt
-# for Python 3, requirements-pypy.txt for PyPy.
-$ pip install -r requirements-2.txt
+# Install dependencies.
+$ pip install -r requirements.txt
 
 # Install.
 $ python setup.py install
@@ -821,6 +821,31 @@ In such cases, it may be advisable to allocate a compute node (using
 `slurm-pipeline.py` on (instead of tying up a SLURM login node), or at
 least to run `slurm-pipeline.py` using `nice`.
 
+## Development
+
+If you like to work on the code or just to run the tests having cloned the
+repo, you'll probabaly want to install some development modules. The
+easiest way is to just
+
+```sh
+$ pip install -r requirements-dev.txt
+```
+
+though you might want to be more selective (e.g., you don't need to install
+Twisted unless you plan to run `make tcheck` to use their `trial` test
+runner).
+
+### Running tests
+
+Any/all of the following should work for you:
+
+```sh
+$ tox # To run the tests on multiple Python versions (see tox.ini).
+$ make check
+$ make tcheck # If you "pip install Twisted" first.
+$ python -m discover -v  # If you run "pip install discover" first.
+```
+
 ## TODO
 
 * Make it possible to pass the names (or at least the prefix) of the
@@ -838,6 +863,7 @@ This code was originally written (and is maintained) by
 
 Contributions have been received from:
 
+* [bestdevev](https://github.com/bestdevev)
 * [Eric Müller (@muffgaga)](https://github.com/muffgaga)
 * [healther](https://github.com/healther)
 * [ldynia](https://github.com/ldynia)

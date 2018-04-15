@@ -4,7 +4,6 @@ import re
 import time
 import subprocess
 from collections import defaultdict
-from os import getlogin
 
 try:
     from subprocess import DEVNULL  # py3k
@@ -13,6 +12,7 @@ except ImportError:
 
 from .base import SlurmPipelineBase
 from .error import SchedulingError, SpecificationError
+from .utils import getlogin
 
 
 class SlurmPipeline(SlurmPipelineBase):
