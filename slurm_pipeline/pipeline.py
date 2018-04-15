@@ -32,6 +32,9 @@ class SlurmPipeline(SlurmPipelineBase):
     NICE_HIGHEST = -10000
     NICE_LOWEST = 10000
 
+    ENV_VARS = ('SP_DEPENDENCY_ARG', 'SP_FORCE', 'SP_FORCE', 'SP_NICE_ARG',
+                'SP_ORIGINAL_ARGS', 'SP_SIMULATE', 'SP_SKIP')
+
     @staticmethod
     def checkSpecification(specification):
         """
@@ -288,6 +291,11 @@ class SlurmPipeline(SlurmPipelineBase):
         @raise SchedulingError: If a script outputs a task name more than once
             or if the step script cannot be executed.
         """
+
+        # Record all SP_* environment variables available to the script.
+        step['environ'] = dict((var, env[var]) for var in self.ENV_VARS
+                               if var in env)
+
         try:
             step['stdout'] = subprocess.check_output(
                 [step['script']] + args, cwd=step.get('cwd', '.'), env=env,

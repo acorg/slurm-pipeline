@@ -510,6 +510,13 @@ class TestSlurmPipeline(TestCase):
         self.assertEqual(
             {
                 'name1': {
+                    'environ': {
+                        'SP_FORCE': '0',
+                        'SP_NICE_ARG': '--nice',
+                        'SP_ORIGINAL_ARGS': '',
+                        'SP_SIMULATE': '0',
+                        'SP_SKIP': '0',
+                    },
                     'name': 'name1',
                     'script': 'script1',
                     'scheduledAt': 10.0,
@@ -520,6 +527,13 @@ class TestSlurmPipeline(TestCase):
                     'tasks': {},
                 },
                 'name2': {
+                    'environ': {
+                        'SP_FORCE': '0',
+                        'SP_NICE_ARG': '--nice',
+                        'SP_ORIGINAL_ARGS': '',
+                        'SP_SIMULATE': '0',
+                        'SP_SKIP': '0',
+                    },
                     'name': 'name2',
                     'scheduledAt': 10.0,
                     'script': 'script2',
@@ -1666,6 +1680,13 @@ class TestSlurmPipeline(TestCase):
                 'startAfter': None,
                 'steps': [
                     {
+                        'environ': {
+                            'SP_FORCE': '1',
+                            'SP_NICE_ARG': '--nice',
+                            'SP_ORIGINAL_ARGS': '',
+                            'SP_SIMULATE': '1',
+                            'SP_SKIP': '0',
+                        },
                         'name': 'name1',
                         'scheduledAt': 10.0,
                         'script': 'script1',
@@ -1680,6 +1701,14 @@ class TestSlurmPipeline(TestCase):
                         },
                     },
                     {
+                        'environ': {
+                            'SP_DEPENDENCY_ARG': '--dependency=afterok:123',
+                            'SP_FORCE': '1',
+                            'SP_NICE_ARG': '--nice',
+                            'SP_ORIGINAL_ARGS': '',
+                            'SP_SIMULATE': '0',
+                            'SP_SKIP': '0',
+                        },
                         'dependencies': ['name1'],
                         'name': 'name2',
                         'scheduledAt': 10.0,

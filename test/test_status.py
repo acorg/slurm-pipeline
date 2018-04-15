@@ -729,6 +729,10 @@ class TestSlurmPipelineStatus(TestCase):
             'steps': [
                 {
                     'cwd': '00-start',
+                    'environ': {
+                        'SP_FORCE': '1',
+                        'SP_SKIP': '0',
+                    },
                     'name': 'start',
                     'scheduledAt': 1481379659.1530972,
                     'script': '00-start/start.sh',
@@ -743,6 +747,10 @@ class TestSlurmPipelineStatus(TestCase):
                     'dependencies': [
                         'start'
                     ],
+                    'environ': {
+                        'SP_FORCE': '1',
+                        'SP_SKIP': '0',
+                    },
                     'name': 'split',
                     'scheduledAt': 1481379664.184737,
                     'script': '01-split/sbatch.sh',
@@ -761,6 +769,10 @@ class TestSlurmPipelineStatus(TestCase):
                     'dependencies': [
                         'split'
                     ],
+                    'environ': {
+                        'SP_FORCE': '1',
+                        'SP_SKIP': '0',
+                    },
                     'name': 'blastn',
                     'scheduledAt': 1481379722.3996398,
                     'script': '02-blastn/sbatch.sh',
@@ -790,6 +802,10 @@ class TestSlurmPipelineStatus(TestCase):
                     'dependencies': [
                         'blastn'
                     ],
+                    'environ': {
+                        'SP_FORCE': '1',
+                        'SP_SKIP': '0',
+                    },
                     'name': 'panel',
                     'scheduledAt': 1481379722.5036008,
                     'script': '03-panel/sbatch.sh',
@@ -818,6 +834,10 @@ class TestSlurmPipelineStatus(TestCase):
                     'dependencies': [
                         'panel'
                     ],
+                    'environ': {
+                        'SP_FORCE': '1',
+                        'SP_SKIP': '0',
+                    },
                     'name': 'stop',
                     'scheduledAt': 1481379722.5428307,
                     'script': '04-stop/sbatch.sh',
@@ -838,7 +858,6 @@ class TestSlurmPipelineStatus(TestCase):
             ]
         }
 
-        self.maxDiff = None
         subprocessMock.return_value = (
             'JobID|State|Elapsed|Nodelist\n'
             '4416231|COMPLETED|04:32:00|cpu-3\n'
@@ -880,6 +899,9 @@ Step 1: start
   Script: 00-start/start.sh
   Simulate: True
   Skip: False
+  Slurm pipeline environment variables:
+    SP_FORCE: 1
+    SP_SKIP: 0
 Step 2: split
   1 step dependency: start
     Dependent on 0 tasks emitted by the dependent step
@@ -895,6 +917,9 @@ Step 2: split
   Script: 01-split/sbatch.sh
   Simulate: True
   Skip: False
+  Slurm pipeline environment variables:
+    SP_FORCE: 1
+    SP_SKIP: 0
 Step 3: blastn
   1 step dependency: split
     Dependent on 3 tasks emitted by the dependent step
@@ -918,6 +943,9 @@ Step 3: blastn
   Script: 02-blastn/sbatch.sh
   Simulate: True
   Skip: False
+  Slurm pipeline environment variables:
+    SP_FORCE: 1
+    SP_SKIP: 0
 Step 4: panel
   1 step dependency: blastn
     Dependent on 3 tasks emitted by the dependent step
@@ -941,6 +969,9 @@ finished
   Script: 03-panel/sbatch.sh
   Simulate: False
   Skip: False
+  Slurm pipeline environment variables:
+    SP_FORCE: 1
+    SP_SKIP: 0
 Step 5: stop
   1 step dependency: panel
     Dependent on 1 task emitted by the dependent step
@@ -959,7 +990,10 @@ finished
   Scheduled at: 2016-12-10 14:22:02
   Script: 04-stop/sbatch.sh
   Simulate: False
-  Skip: False''',
+  Skip: False
+  Slurm pipeline environment variables:
+    SP_FORCE: 1
+    SP_SKIP: 0''',
             sps.toStr())
 
     @patch('subprocess.check_output')
@@ -982,6 +1016,10 @@ finished
             'steps': [
                 {
                     'cwd': '00-start',
+                    'environ': {
+                        'SP_FORCE': '1',
+                        'SP_SKIP': '0',
+                    },
                     'name': 'start-step',
                     'scheduledAt': 1481379659.1530972,
                     'script': '00-start/start.sh',
@@ -1029,5 +1067,8 @@ Step 1: start-step
   Scheduled at: 2016-12-10 14:20:59
   Script: 00-start/start.sh
   Simulate: True
-  Skip: False''',
+  Skip: False
+  Slurm pipeline environment variables:
+    SP_FORCE: 1
+    SP_SKIP: 0''',
             sps.toStr())

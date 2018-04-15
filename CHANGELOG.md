@@ -1,3 +1,8 @@
+## Version 2.0.7 - April 15, 2018
+
+Added printing of SP_* environment variables to per-step output of
+`slurm-pipeline-status.py`.
+
 ## Version 2.0.6 - April 15, 2018
 
 Added "Collect step:" to per-step output of `slurm-pipeline-status.py`.

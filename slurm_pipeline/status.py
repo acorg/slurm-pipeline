@@ -227,6 +227,10 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             '  Skip: %s' % step['skip'],
         ])
 
+        append('  Slurm pipeline environment variables:')
+        for var in sorted(step['environ']):
+            append('    %s: %s' % (var, step['environ'][var]))
+
         return result
 
     def _stepsSummary(self):
