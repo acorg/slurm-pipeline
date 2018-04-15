@@ -26,10 +26,10 @@ parser.add_argument(
           'in JSON format.'))
 
 parser.add_argument(
-    '--fieldNames', nargs='*', default=' '.join(SAcct.DEFAULT_FIELD_NAMES),
-    help=('A list of SLURM job field names to obtain from sacct for listing '
-          'job status information. See man sacct for the full list of '
-          'possible field names.'))
+    '--fieldNames', default=SAcct.DEFAULT_FIELD_NAMES,
+    help=('A comma-separated list of SLURM job field names to obtain from '
+          'sacct for listing job status information. See man sacct for the '
+          'full list of possible field names.'))
 
 # Only one of --printUnfinished, --printFinished, or --printFinal can be given.
 group = parser.add_mutually_exclusive_group()

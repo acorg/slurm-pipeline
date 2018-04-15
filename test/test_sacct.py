@@ -1,6 +1,5 @@
 from unittest import TestCase
 from six import assertRaisesRegex
-from os import getlogin
 
 try:
     from unittest.mock import patch
@@ -24,22 +23,55 @@ class TestSAcct(TestCase):
         subprocessMock.side_effect = OSError('No such file or directory')
         error = (
             "^Encountered OSError \(No such file or directory\) when running "
-            "'sacct -P -u %s --format JobId,State,Elapsed,Nodelist "
-            "-S 1970-01-01T00:00:43'$" % getlogin())
-        assertRaisesRegex(self, SAcctError, error,  SAcct, {'scheduledAt': 44})
+            "'sacct -P --format JobId,State,Elapsed,Nodelist --jobs 35,40'$")
+        specification = {
+            'scheduledAt': 44,
+            'startAfter': None,
+            'steps': [],
+        }
+        assertRaisesRegex(self, SAcctError, error,  SAcct, specification,
+                          {35, 40})
 
     @patch('subprocess.check_output')
     def testSacctCalledAsExpectedWhenNoArgsPassed(self, subprocessMock):
         """
-        When no sacct arguments are passed, it must be called as expected
-        (with -u LOGIN_NAME).
+        When no sacct field names are passed, it must be called as expected.
         """
-        subprocessMock.return_value = 'JobID|State|Elapsed|Nodelist\n'
-        SAcct({'scheduledAt': 44})
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '1|COMPLETED|04:32:00|cpu-3\n'
+            '2|FAILED|05:11:37|cpu-4\n'
+        )
+        SAcct({
+            'scheduledAt': 44,
+            'startAfter': None,
+            'steps': [],
+        }, {1, 2})
         subprocessMock.assert_called_once_with(
-            ['sacct', '-P', '-u', getlogin(), '--format',
-             'JobId,State,Elapsed,Nodelist', '-S', '1970-01-01T00:00:43'],
+            ['sacct', '-P', '--format', 'JobId,State,Elapsed,Nodelist',
+             '--jobs', '1,2'],
             universal_newlines=True)
+
+    @patch('subprocess.check_output')
+    def testSacctFailsToReturnAllJobIds(self, subprocessMock):
+        """
+        If sacct doesn't mention a needed job id, an SAcctError must be raised.
+        """
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '1|COMPLETED|04:32:00|cpu-3\n'
+            '2|FAILED|05:11:37|cpu-4\n'
+        )
+
+        error = ('^sacct did not return information about the following job '
+                 'id: 3$')
+        assertRaisesRegex(self, SAcctError, error,  SAcct,
+                          {
+                              'scheduledAt': 100,
+                              'startAfter': None,
+                              'steps': [],
+                          },
+                          {1, 2, 3})
 
     @patch('subprocess.check_output')
     def testSacctCalledAsExpectedWhenFieldNamesPassed(self, subprocessMock):
@@ -53,10 +85,17 @@ class TestSAcct(TestCase):
             '1|red|1968\n'
             '2|green|2011\n'
         )
-        s = SAcct({'scheduledAt': 44}, fieldNames=('Color', 'Year'))
+        s = SAcct(
+            {
+                'scheduledAt': 44,
+                'startAfter': None,
+                'steps': [],
+            },
+            {1, 2},
+            fieldNames='Color,Year')
         subprocessMock.assert_called_once_with(
-            ['sacct', '-P', '-u', getlogin(), '--format', 'JobId,Color,Year',
-             '-S', '1970-01-01T00:00:43'], universal_newlines=True)
+            ['sacct', '-P', '--format', 'JobId,Color,Year', '--jobs', '1,2'],
+            universal_newlines=True)
         self.assertEqual({'color': 'red', 'year': '1968'}, s.jobs[1])
         self.assertEqual({'color': 'green', 'year': '2011'}, s.jobs[2])
 
@@ -71,10 +110,14 @@ class TestSAcct(TestCase):
             '1|COMPLETED|04:32:00|(none)\n'
             '1|FAILED|05:11:37|cpu-4\n'
         )
-        error = ("^Job id 1 found more than once in 'sacct -P -u %s --format "
-                 "JobId,State,Elapsed,Nodelist -S 1970-01-01T00:00:43' output$"
-                 % getlogin())
-        assertRaisesRegex(self, SAcctError, error,  SAcct, {'scheduledAt': 44})
+        error = ("^Job id 1 found more than once in 'sacct -P --format "
+                 "JobId,State,Elapsed,Nodelist --jobs 1' output$")
+        assertRaisesRegex(self, SAcctError, error,  SAcct,
+                          {
+                              'scheduledAt': 44,
+                              'startAfter': None,
+                              'steps': [],
+                          }, {1})
 
     @patch('subprocess.check_output')
     def testJobsDict(self, subprocessMock):
@@ -87,7 +130,13 @@ class TestSAcct(TestCase):
             '1|COMPLETED|04:32:00|(none)\n'
             '2|FAILED|05:11:37|cpu-4\n'
         )
-        sq = SAcct({'scheduledAt': 44})
+        sa = SAcct(
+            {
+                'scheduledAt': 44,
+                'startAfter': None,
+                'steps': [],
+            },
+            {1, 2})
         self.assertEqual(
             {
                 1: {
@@ -101,22 +150,82 @@ class TestSAcct(TestCase):
                     'nodelist': 'cpu-4',
                 },
             },
-            sq.jobs
+            sa.jobs
         )
 
     @patch('subprocess.check_output')
-    def testFinished(self, subprocessMock):
+    def testJobsDictWithSecondHeaderLine(self, subprocessMock):
         """
-        It must be possible to tell whether a job has finished.
+        The jobs dict on an SAcct instance must be set correctly if the
+        input for some reason contains a second header line (as is printed,
+        for some reason, when you call sacct with no arguments).
         """
         subprocessMock.return_value = (
             'JobID|State|Elapsed|Nodelist\n'
-            '1|RUNNING|04:32:00|(none)\n'
-            '3|FAILED|05:11:37|cpu-4\n'
+            '----- ----- ----- -----\n'
+            '1|COMPLETED|04:32:00|(none)\n'
+            '2|FAILED|05:11:37|cpu-4\n'
         )
-        sq = SAcct({'scheduledAt': 44})
-        self.assertFalse(sq.finished(1))
-        self.assertTrue(sq.finished(3))
+        sa = SAcct(
+            {
+                'scheduledAt': 44,
+                'startAfter': None,
+                'steps': [],
+            },
+            {1, 2})
+        self.assertEqual(
+            {
+                1: {
+                    'elapsed': '04:32:00',
+                    'state': 'COMPLETED',
+                    'nodelist': '(none)',
+                },
+                2: {
+                    'elapsed': '05:11:37',
+                    'state': 'FAILED',
+                    'nodelist': 'cpu-4',
+                },
+            },
+            sa.jobs
+        )
+
+    @patch('subprocess.check_output')
+    def testJobsDictWithJobIdsContainingDots(self, subprocessMock):
+        """
+        The jobs dict on an SAcct instance must be set correctly if the
+        input contains job ids that have dots in them. Only the lines with
+        job ids that do not have dots should be processed.
+        """
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '1|COMPLETED|04:32:00|cpu-0\n'
+            '1.batch|COMPLETED|04:00:00|cpu-2\n'
+            '1.extern|COMPLETED|03:00:00|cpu-3\n'
+            '2.batch|FAILED|06:11:37|cpu-5\n'
+            '2|FAILED|05:11:37|cpu-4\n'
+        )
+        sa = SAcct(
+            {
+                'scheduledAt': 44,
+                'startAfter': None,
+                'steps': [],
+            },
+            {1, 2})
+        self.assertEqual(
+            {
+                1: {
+                    'elapsed': '04:32:00',
+                    'state': 'COMPLETED',
+                    'nodelist': 'cpu-0',
+                },
+                2: {
+                    'elapsed': '05:11:37',
+                    'state': 'FAILED',
+                    'nodelist': 'cpu-4',
+                },
+            },
+            sa.jobs
+        )
 
     @patch('subprocess.check_output')
     def testSummarize(self, subprocessMock):
@@ -129,10 +238,117 @@ class TestSAcct(TestCase):
             '2|FAILED|05:11:37|cpu-4\n'
             '3|FINISHED|05:13:00|cpu-6\n'
         )
-        sq = SAcct({'scheduledAt': 100})
+        sa = SAcct(
+            {
+                'scheduledAt': 100,
+                'startAfter': None,
+                'steps': [],
+            },
+            {1, 2, 3})
         self.assertEqual('State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3',
-                         sq.summarize(1))
+                         sa.summarize(1))
         self.assertEqual('State=FAILED, Elapsed=05:11:37, Nodelist=cpu-4',
-                         sq.summarize(2))
+                         sa.summarize(2))
         self.assertEqual('State=FINISHED, Elapsed=05:13:00, Nodelist=cpu-6',
-                         sq.summarize(3))
+                         sa.summarize(3))
+
+    @patch('subprocess.check_output')
+    def testSummarizePreservesFieldNameCase(self, subprocessMock):
+        """
+        The summary of a job must preserve the case of the field names
+        provided by the user.
+        """
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '1|COMPLETED|04:32:00|cpu-3\n'
+        )
+        sa = SAcct(
+            {
+                'scheduledAt': 100,
+                'startAfter': None,
+                'steps': [],
+            },
+            {1},
+            fieldNames='STATE,eLAPSED,Nodelist')
+        self.assertEqual('STATE=COMPLETED, eLAPSED=04:32:00, Nodelist=cpu-3',
+                         sa.summarize(1))
+
+    @patch('subprocess.check_output')
+    def testFinished(self, subprocessMock):
+        """
+        The 'finished' method must function as expected.
+        """
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '1|RUNNING|04:32:00|(none)\n'
+            '2|FAILED|05:11:37|cpu-4\n'
+        )
+        sa = SAcct(
+            {
+                'scheduledAt': 44,
+                'startAfter': None,
+                'steps': [],
+            },
+            {1, 2})
+        self.assertFalse(sa.finished(1))
+        self.assertTrue(sa.finished(2))
+
+    @patch('subprocess.check_output')
+    def testFailed(self, subprocessMock):
+        """
+        The 'failed' method must function as expected.
+        """
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '1|COMPLETED|04:32:00|(none)\n'
+            '2|FAILED|05:11:37|cpu-4\n'
+        )
+        sa = SAcct(
+            {
+                'scheduledAt': 44,
+                'startAfter': None,
+                'steps': [],
+            },
+            {1, 2})
+        self.assertFalse(sa.failed(1))
+        self.assertTrue(sa.failed(2))
+
+    @patch('subprocess.check_output')
+    def testCompleted(self, subprocessMock):
+        """
+        The 'completed' method must function as expected.
+        """
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '1|RUNNING|04:32:00|(none)\n'
+            '2|COMPLETED|05:11:37|cpu-4\n'
+        )
+        sa = SAcct(
+            {
+                'scheduledAt': 44,
+                'startAfter': None,
+                'steps': [],
+            },
+            {1, 2})
+        self.assertFalse(sa.completed(1))
+        self.assertTrue(sa.completed(2))
+
+    @patch('subprocess.check_output')
+    def testState(self, subprocessMock):
+        """
+        The 'state' method must function as expected.
+        """
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '1|RUNNING|04:32:00|(none)\n'
+            '2|COMPLETED|05:11:37|cpu-4\n'
+        )
+        sa = SAcct(
+            {
+                'scheduledAt': 44,
+                'startAfter': None,
+                'steps': [],
+            },
+            {1, 2})
+        self.assertEqual('RUNNING', sa.state(1))
+        self.assertTrue('COMPLETED', sa.state(2))

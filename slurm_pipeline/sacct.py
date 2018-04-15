@@ -1,9 +1,8 @@
-from os import getlogin
+from os import environ
 import subprocess
 from collections import defaultdict
 
 from .error import SAcctError
-from .utils import secondsToTime
 
 
 class SAcct(object):
@@ -11,25 +10,24 @@ class SAcct(object):
     Fetch information about job id status from sacct.
 
     @param specification: A C{dict} containing an execution specification.
+    @param jobIdsOfInterest: A C{set} of C{int} job ids that are relevant to
+        this specification. This is the union of jobs emitted when the
+        specification was run and the job ids (if any) given on the command
+        line via --startAfter.
     @param fieldNames: A C{list} of C{str} job field names to obtain from
         sacct. If C{None}, C{self.DEFAULT_FIELD_NAMES} will be used. See man
         sacct for the full list of possible field names.
     """
 
-    DEFAULT_FIELD_NAMES = ('State', 'Elapsed', 'Nodelist')
+    DEFAULT_FIELD_NAMES = 'State,Elapsed,Nodelist'
 
-    def __init__(self, specification, fieldNames=None):
-        self.fieldNames = (tuple(fieldNames) if fieldNames
-                           else self.DEFAULT_FIELD_NAMES)
-
-        startTime = secondsToTime(specification['scheduledAt'] - 1.0,
-                                  sacctCompatible=True)
+    def __init__(self, specification, jobIdsOfInterest, fieldNames=None):
+        self.fieldNames = (fieldNames or environ.get('SP_STATUS_FIELD_NAMES')
+                           or self.DEFAULT_FIELD_NAMES)
         args = [
-            # Use specification.get here because the 'user' key will
-            # not be present in older versions of our status output
-            # (added in 1.1.14).
-            'sacct', '-P', '-u', specification.get('user', getlogin()),
-            '--format', 'JobId,' + ','.join(self.fieldNames), '-S', startTime]
+            'sacct', '-P', '--format', 'JobId,' + self.fieldNames,
+            '--jobs', ','.join(map(str, sorted(jobIdsOfInterest)))
+        ]
         try:
             out = subprocess.check_output(args, universal_newlines=True)
         except OSError as e:
@@ -37,7 +35,7 @@ class SAcct(object):
                              (e, ' '.join(args)))
 
         self.jobs = jobs = defaultdict(dict)
-        fieldNamesLower = tuple(map(str.lower, self.fieldNames))
+        fieldNamesLower = tuple(map(str.lower, self.fieldNames.split(',')))
 
         for count, line in enumerate(out.split('\n')):
             if count == 0 or (count == 1 and line and line[0] == '-'):
@@ -56,10 +54,18 @@ class SAcct(object):
                     raise SAcctError(
                         "Job id %d found more than once in '%s' output" %
                         (jobId, ' '.join(args)))
-                fields.pop(0)
-                jobInfo = jobs[jobId]
-                for fieldName, value in zip(fieldNamesLower, fields):
-                    jobInfo[fieldName] = value
+                if jobId in jobIdsOfInterest:
+                    jobIdsOfInterest.remove(jobId)
+                    fields.pop(0)
+                    jobInfo = jobs[jobId]
+                    for fieldName, value in zip(fieldNamesLower, fields):
+                        jobInfo[fieldName] = value
+
+        if jobIdsOfInterest:
+            raise SAcctError(
+                'sacct did not return information about the following job '
+                'id%s: %s' % ('' if len(jobIdsOfInterest) == 1 else 's',
+                              ', '.join(map(str, sorted(jobIdsOfInterest)))))
 
     def finished(self, jobId):
         """
@@ -112,4 +118,4 @@ class SAcct(object):
         jobInfo = self.jobs[jobId]
         return ', '.join(
             '%s=%s' % (fieldName, jobInfo[fieldName.lower()])
-            for fieldName in self.fieldNames)
+            for fieldName in self.fieldNames.split(','))

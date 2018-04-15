@@ -777,7 +777,7 @@ class TestSlurmPipeline(TestCase):
     def testStartAfter(
             self, existsMock, accessMock, subprocessMock):
         """
-        If a step has no dependencies but a startAfter values is passed to
+        If a step has no dependencies but a startAfter value is passed to
         schedule, it must have the expected SP_DEPENDENCY_ARG value set
         in its environment.
         """
@@ -794,8 +794,87 @@ class TestSlurmPipeline(TestCase):
 
         # Check that the dependency environment variable is correct.
         env = subprocessMock.mock_calls[0][2]['env']
-        self.assertEqual('--dependency=afterany:35,afterany:36',
+        self.assertEqual('--dependency=afterok:35,afterok:36',
                          env['SP_DEPENDENCY_ARG'])
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testDependencyEmitsNoTasksButThereIsAStartAfterList(
+            self, existsMock, accessMock, subprocessMock):
+        """
+        If a step has a dependency and the dependency emits no tasks but there
+        is a startAfter list of jobs ids, the value of SP_DEPENDENCY_ARG must
+        contain the start after jobs.
+        """
+        subprocessMock.return_value = ''
+
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'dependencies': ['name1'],
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                ],
+            })
+        sp.schedule(startAfter=(1, 3))
+
+        # Check that the dependency environment variable is correct in
+        # all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('--dependency=afterok:1,afterok:3',
+                         env1['SP_DEPENDENCY_ARG'])
+
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('--dependency=afterok:1,afterok:3',
+                         env2['SP_DEPENDENCY_ARG'])
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    def testDependencyEmitsNoTasksButThereIsAStartAfterListErrorStep(
+            self, existsMock, accessMock, subprocessMock):
+        """
+        If an error step has a dependency and the dependency emits no tasks
+        but there is a startAfter list of jobs ids, the value of
+        SP_DEPENDENCY_ARG must contain the start after jobs and use afternotok.
+        """
+        subprocessMock.return_value = ''
+
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                    {
+                        'dependencies': ['name1'],
+                        'error step': True,
+                        'name': 'name2',
+                        'script': 'script2',
+                    },
+                ],
+            })
+        sp.schedule(startAfter=(1, 3))
+
+        # Check that the dependency environment variable is correct in
+        # all calls.
+        env1 = subprocessMock.mock_calls[0][2]['env']
+        self.assertEqual('--dependency=afterok:1,afterok:3',
+                         env1['SP_DEPENDENCY_ARG'])
+
+        # The second step must be have afternotok in its SP_DEPENDENCY_ARG
+        # variable.
+        env2 = subprocessMock.mock_calls[1][2]['env']
+        self.assertEqual('--dependency=afternotok:1?afternotok:3',
+                         env2['SP_DEPENDENCY_ARG'])
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -805,8 +884,8 @@ class TestSlurmPipeline(TestCase):
                                       subprocessMock):
         """
         If a step has a cwd set and its script is a relative path, the path of
-        the executed script that is executed must be as specified (not
-        converted to an absolute path).
+        the script that is executed must be as specified (not converted to an
+        absolute path).
         """
         subprocessMock.return_value = ''
 
@@ -1480,7 +1559,6 @@ class TestSlurmPipeline(TestCase):
         """
         subprocessMock.return_value = 'TASK: xxx 123\n'
         timeMock.return_value = 10.0
-        self.maxDiff = None
 
         sp = SlurmPipeline(
             {
@@ -1546,27 +1624,6 @@ class TestSlurmPipeline(TestCase):
             },
             sort_keys=True, indent=2, separators=(',', ': '))
         self.assertEqual(expected, sp.specificationToJSON(specification))
-
-    @patch('os.access')
-    @patch('os.path.exists')
-    def testErrorStepWithNoDependencies(self, existsMock, accessMock):
-        """
-        If the specification steps contains an error step that does not have
-        any dependencies, a SpecificationError must be raised because error
-        steps only exist for the purposed of catching failed dependencies.
-        """
-        error = (
-            "^Step 1 \('xx'\) is an error step but has no 'dependencies' key$")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'error step': True,
-                                      'name': 'xx',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
 
     @patch('subprocess.check_output')
     @patch('os.access')

@@ -36,6 +36,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -80,6 +81,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -134,6 +136,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -189,6 +192,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -221,6 +225,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -256,6 +261,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -291,6 +297,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -326,6 +333,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -357,6 +365,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -391,6 +400,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -425,6 +435,7 @@ class TestSlurmPipelineStatus(TestCase):
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': [],
             'skip': [],
+            'startAfter': None,
             'steps': [
                 {
                     'name': 'start',
@@ -460,6 +471,244 @@ class TestSlurmPipelineStatus(TestCase):
 
         sps = SlurmPipelineStatus(status)
         self.assertEqual({12, 56, 90}, sps.unfinishedJobs())
+
+    @patch('subprocess.check_output')
+    def testFinishedJobsNoJobs(self, subprocessMock):
+        """
+        The finishedJobs method should return an empty set if a
+        specification emitted no jobs.
+        """
+        status = {
+            'force': False,
+            'lastStep': None,
+            'scheduledAt': 1481379658.5455897,
+            'scriptArgs': [],
+            'skip': [],
+            'startAfter': None,
+            'steps': [
+                {
+                    'name': 'start',
+                    'scheduledAt': 1481379659.1530972,
+                    'script': 'start.sh',
+                    'stdout': '',
+                    'taskDependencies': {},
+                    'tasks': {},
+                },
+            ],
+        }
+
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+        )
+
+        sps = SlurmPipelineStatus(status)
+        self.assertEqual(set(), sps.finishedJobs())
+
+    @patch('subprocess.check_output')
+    def testFinishedJobsOneFinishedJob(self, subprocessMock):
+        """
+        The finishedJobs method should return a set with the expected job id
+        if the specification emitted one job that is finished.
+        """
+        status = {
+            'force': False,
+            'lastStep': None,
+            'scheduledAt': 1481379658.5455897,
+            'scriptArgs': [],
+            'skip': [],
+            'startAfter': None,
+            'steps': [
+                {
+                    'name': 'start',
+                    'scheduledAt': 1481379659.1530972,
+                    'script': 'start.sh',
+                    'stdout': '',
+                    'taskDependencies': {},
+                    'tasks': {
+                        'xxx': [123],
+                    },
+                },
+            ],
+        }
+
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '123|COMPLETED|04:32:00|cpu-4\n'
+        )
+
+        sps = SlurmPipelineStatus(status)
+        self.assertEqual({123}, sps.finishedJobs())
+
+    @patch('subprocess.check_output')
+    def testFinishedJobsOneUnfinishedJob(self, subprocessMock):
+        """
+        The finishedJobs method should return an empty set if the
+        specification emitted one job that is not finished.
+        """
+        status = {
+            'force': False,
+            'lastStep': None,
+            'scheduledAt': 1481379658.5455897,
+            'scriptArgs': [],
+            'skip': [],
+            'startAfter': None,
+            'steps': [
+                {
+                    'name': 'start',
+                    'scheduledAt': 1481379659.1530972,
+                    'script': 'start.sh',
+                    'stdout': '',
+                    'taskDependencies': {},
+                    'tasks': {
+                        'xxx': [123],
+                    },
+                },
+            ],
+        }
+
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '123|RUNNING|04:32:00|cpu-4\n'
+        )
+
+        sps = SlurmPipelineStatus(status)
+        self.assertEqual(set(), sps.finishedJobs())
+
+    @patch('subprocess.check_output')
+    def testFinishedJobsMultipleSteps(self, subprocessMock):
+        """
+        The finishedJobs method should return the expected job ids if the
+        specification has multiple steps.
+        """
+        status = {
+            'force': False,
+            'lastStep': None,
+            'scheduledAt': 1481379658.5455897,
+            'scriptArgs': [],
+            'skip': [],
+            'startAfter': None,
+            'steps': [
+                {
+                    'name': 'start',
+                    'scheduledAt': 1481379659.1530972,
+                    'script': 'start.sh',
+                    'stdout': '',
+                    'taskDependencies': {},
+                    'tasks': {
+                        'xxx': [12, 34],
+                    },
+                },
+                {
+                    'name': 'end',
+                    'scheduledAt': 1481379659.1530972,
+                    'script': 'end.sh',
+                    'stdout': '',
+                    'taskDependencies': {},
+                    'tasks': {
+                        'yyy': [56, 78, 90],
+                    },
+                },
+            ],
+        }
+
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '12|RUNNING|04:32:00|cpu-3\n'
+            '34|COMPLETED|04:32:00|cpu-3\n'
+            '56|RUNNING|04:32:00|cpu-4\n'
+            '78|COMPLETED|04:32:00|cpu-4\n'
+            '90|RUNNING|04:32:00|cpu-5\n'
+        )
+
+        sps = SlurmPipelineStatus(status)
+        self.assertEqual({34, 78}, sps.finishedJobs())
+
+    @patch('subprocess.check_output')
+    def testJobIdsNoJobs(self, subprocessMock):
+        """
+        The jobs method should return an empty set when no jobs were started.
+        """
+        status = {
+            'force': False,
+            'lastStep': None,
+            'scheduledAt': 1481379658.5455897,
+            'scriptArgs': [],
+            'skip': [],
+            'startAfter': None,
+            'steps': [
+                {
+                    'name': 'start',
+                    'scheduledAt': 1481379659.1530972,
+                    'script': 'start.sh',
+                    'stdout': '',
+                    'taskDependencies': {},
+                    'tasks': {},
+                },
+                {
+                    'name': 'end',
+                    'scheduledAt': 1481379659.1530972,
+                    'script': 'end.sh',
+                    'stdout': '',
+                    'taskDependencies': {},
+                    'tasks': {},
+                },
+            ],
+        }
+
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+        )
+
+        sps = SlurmPipelineStatus(status)
+        self.assertEqual(set(), sps.jobs())
+
+    @patch('subprocess.check_output')
+    def testJobIds(self, subprocessMock):
+        """
+        The jobs method should return all emitted job ids.
+        """
+        status = {
+            'force': False,
+            'lastStep': None,
+            'scheduledAt': 1481379658.5455897,
+            'scriptArgs': [],
+            'skip': [],
+            'startAfter': None,
+            'steps': [
+                {
+                    'name': 'start',
+                    'scheduledAt': 1481379659.1530972,
+                    'script': 'start.sh',
+                    'stdout': '',
+                    'taskDependencies': {},
+                    'tasks': {
+                        'xxx': [12, 34],
+                    },
+                },
+                {
+                    'name': 'end',
+                    'scheduledAt': 1481379659.1530972,
+                    'script': 'end.sh',
+                    'stdout': '',
+                    'taskDependencies': {},
+                    'tasks': {
+                        'yyy': [56, 78, 90],
+                    },
+                },
+            ],
+        }
+
+        subprocessMock.return_value = (
+            'JobID|State|Elapsed|Nodelist\n'
+            '12|RUNNING|04:32:00|cpu-3\n'
+            '34|COMPLETED|04:32:00|cpu-3\n'
+            '56|RUNNING|04:32:00|cpu-4\n'
+            '78|COMPLETED|04:32:00|cpu-4\n'
+            '90|RUNNING|04:32:00|cpu-5\n'
+        )
+
+        sps = SlurmPipelineStatus(status)
+        self.assertEqual({12, 34, 56, 78, 90}, sps.jobs())
 
     @patch('subprocess.check_output')
     def testToStr(self, subprocessMock):
@@ -612,13 +861,15 @@ Scheduling arguments:
   Script arguments: <None>
   Skip: <None>
   Start after: <None>
-5 jobs emitted in total, of which 4 (80.00%) are finished
-Step summary:
-  start: no jobs emitted
-  split: no jobs emitted
-  blastn: 3 jobs emitted, 3 (100.00%) finished
-  panel: 1 job emitted, 1 (100.00%) finished
-  stop: 1 job emitted, 0 (0.00%) finished
+Steps summary:
+  Number of steps: 5
+  Jobs emitted in total: 5
+  Jobs finished: 4 (80.00%)
+    start: no jobs emitted
+    split: no jobs emitted
+    blastn: 3 jobs emitted, 3 (100.00%) finished
+    panel: 1 job emitted, 1 (100.00%) finished
+    stop: 1 job emitted, 0 (0.00%) finished
 Step 1: start
   No dependencies.
   No tasks emitted by this step
@@ -714,15 +965,15 @@ Step 5: stop
             'firstStep': None,
             'force': False,
             'lastStep': None,
+            'nice': 'None',
             'scheduledAt': 1481379658.5455897,
             'scriptArgs': ['hey', 'you'],
-            'skip': ['skip', 'this'],
-            'startAfter': ['34', '56'],
-            'nice': 'None',
+            'skip': ['start-step'],
+            'startAfter': [34, 56],
             'steps': [
                 {
                     'cwd': '00-start',
-                    'name': 'start',
+                    'name': 'start-step',
                     'scheduledAt': 1481379659.1530972,
                     'script': '00-start/start.sh',
                     'simulate': True,
@@ -736,7 +987,8 @@ Step 5: stop
 
         subprocessMock.return_value = (
             'JobID|State|Elapsed|Nodelist\n'
-            '4417616|RUNNING|04:32:00|cpu-3\n'
+            '34|RUNNING|04:32:00|cpu-3\n'
+            '56|RUNNING|04:32:00|cpu-3\n'
         )
 
         sps = SlurmPipelineStatus(status)
@@ -750,12 +1002,14 @@ Scheduling arguments:
   Last step: None
   Nice: None
   Script arguments: hey you
-  Skip: skip, this
+  Skip: start-step
   Start after: 34, 56
-0 jobs emitted in total, of which 0 (100.00%) are finished
-Step summary:
-  start: no jobs emitted
-Step 1: start
+Steps summary:
+  Number of steps: 1
+  Jobs emitted in total: 0
+  Jobs finished: 0 (100.00%)
+    start-step: no jobs emitted
+Step 1: start-step
   No dependencies.
   No tasks emitted by this step
   Working directory: 00-start

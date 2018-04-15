@@ -31,7 +31,7 @@ class SlurmPipelineBase(object):
     @staticmethod
     def checkSpecification(specification):
         """
-        Check an execution specification is syntactically as expected.
+        Check an execution specification is as expected.
 
         @param specification: A C{dict} containing an execution specification.
         @raise SpecificationError: if there is anything wrong with the
@@ -107,11 +107,14 @@ class SlurmPipelineBase(object):
                             'not-yet-defined) step: %r' %
                             (count, stepName, dependency))
 
-            else:
-                if 'error step' in step:
+        if 'skip' in specification:
+            if not isinstance(specification['skip'], list):
+                raise SpecificationError("The 'skip' key must be a list")
+            for stepName in specification['skip']:
+                if stepName not in stepNames:
                     raise SpecificationError(
-                        'Step %d (%r) is an error step but has no '
-                        "'dependencies' key" % (count, stepName))
+                        "The 'skip' key mentions a non-existent step, '%s'" %
+                        stepName)
 
     @staticmethod
     def _loadSpecification(specificationFile):

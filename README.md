@@ -1,10 +1,11 @@
 # slurm-pipeline
 
-A Python class for scheduling and examining
+A [Python](https://www.python.org) class for scheduling and examining
 [SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
-Runs under Python 2.7, 3.5, and [pypy](http://pypy.org/).
+Runs under Python 2.7, 3.5, 3.6, and [pypy](http://pypy.org/) 5.10.0.
+[Change log](CHANGELOG.md).
 
 ## Installation
 
@@ -46,7 +47,7 @@ The `bin` directory of this repo contains the following Python scripts:
   order, taking into account (possibly complex) inter-program dependencies.
 * `slurm-pipeline-status.py` must be given a specification status (as
   produced by `slurm-pipeline.py`) and prints a summary of the status
-  including job status (obtained from `squeue`). It can also be used to
+  including job status (obtained from `sacct`). It can also be used to
   print a list of unfinished jobs (useful for canceling the jobs of a
   running specification) or a list of the final jobs of a scheduled
   pipeline (useful for making sure that jobs scheduled in a subsequent run
@@ -376,9 +377,14 @@ look like they are submitting jobs to `sbatch`).
 
 * `--specification filename`: must contain a status specification, as
     printed by `slurm-pipeline.py`. Required.
-* `--squeueArgs`: A list of arguments to pass to squeue (this must include
-    the squeue command itself). If not specified, the user's login name
-    will be appended to `squeue -u`.
+* `--fieldNames`: A comma-separated list of job status field names. These
+    will be passed directly to `sacct` using its `--format` argument (see
+    `sacct --helpformat` for the full list of field names). The values of
+    these fields will be printed for each job in the
+    `slurm-pipeline-status.py` output. For convenience, you can store your
+    preferred set of field names in an environment variable,
+    `SP_STATUS_FIELD_NAMES`, to be used each time you run
+    `slurm-pipeline-status.py`.
 * `--printUnfinished`: If specified, just print a list of job ids that have
     not yet finished. This can be used to cancel a job, via e.g.,
 
@@ -404,12 +410,13 @@ look like they are submitting jobs to `sbatch`).
 If neither `--printUnfinished` nor `--printFinal` is given,
 `slurm-pipeline-status.py` prints a detailed summary of the status of the
 specification it is given.  This will include the current status (obtained
-from [`squeue`](https://slurm.schedmd.com/squeue.html)) of all jobs
+from [`sacct`](https://slurm.schedmd.com/sacct.html)) of all jobs
 launched.  Example output will resemble the following:
 
 ```sh
 $ slurm-pipeline.py --specification spec1.json > status.json
 $ slurm-pipeline-status.py --specification status.json
+Scheduled by: sally
 Scheduled at: 2016-12-10 14:20:58
 Scheduling arguments:
   First step: panel
@@ -418,13 +425,15 @@ Scheduling arguments:
   Script arguments: <None>
   Skip: <None>
   Start after: <None>
-5 jobs emitted in total, of which 4 (80.00%) are finished
-Step summary:
-  start: no jobs emitted
-  split: no jobs emitted
-  blastn: 3 jobs emitted, 3 (100.00%) finished
-  panel: 1 job emitted, 1 (100.00%) finished
-  stop: 1 job emitted, 0 (0.00%) finished
+Steps summary:
+  Number of steps: 5
+  Jobs emitted in total: 5
+  Jobs finished: 4 (80.00%)
+    start: no jobs emitted
+    split: no jobs emitted
+    blastn: 3 jobs emitted, 3 (100.00%) finished
+    panel: 1 job emitted, 1 (100.00%) finished
+    stop: 1 job emitted, 0 (0.00%) finished
 Step 1: start
   No dependencies.
   No tasks emitted by this step
@@ -459,11 +468,11 @@ Step 3: blastn
     3 jobs started by this task, of which 3 (100.00%) are finished
     Tasks:
       chunk-aaaaa
-        Job 4416231: Finished
+        Job 4416231: State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
       chunk-aaaab
-        Job 4416232: Finished
+        Job 4416232: State=COMPLETED, Elapsed=04:02:00, Nodelist=cpu-6
       chunk-aaaac
-        Job 4416233: Finished
+        Job 4416233: State=COMPLETED, Elapsed=04:12:00, Nodelist=cpu-7
   Working directory: 02-blastn
   Scheduled at: 2016-12-10 14:22:02
   Script: 02-blastn/sbatch.sh
@@ -475,11 +484,11 @@ Step 4: panel
     3 jobs started by the dependent task, of which 3 (100.00%) are finished
     Dependent tasks:
       chunk-aaaaa
-        Job 4416231: Finished
+        Job 4416231: State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3
       chunk-aaaab
-        Job 4416232: Finished
+        Job 4416232: State=COMPLETED, Elapsed=04:02:00, Nodelist=cpu-6
       chunk-aaaac
-        Job 4416233: Finished
+        Job 4416233: State=COMPLETED, Elapsed=04:12:00, Nodelist=cpu-7
   1 task emitted by this step
     1 job started by this task, of which 1 (100.00%) are finished
     Tasks:
@@ -496,12 +505,12 @@ Step 5: stop
     1 job started by the dependent task, of which 1 (100.00%) are finished
     Dependent tasks:
       panel
-        Job 4417615: Finished
+        Job 4417615: State=COMPLETED, Elapsed=04:11:00, Nodelist=cpu-8
   1 task emitted by this step
     1 job started by this task, of which 0 (0.00%) are finished
     Tasks:
       stop
-        Job 4417616: Status=R Time=4:27 Nodelist=cpu-3
+        Job 4417616: State=RUNNING, Elapsed=04:32:00, Nodelist=cpu-3
   Working directory: 04-stop
   Scheduled at: 2016-12-10 14:22:02
   Script: 04-stop/sbatch.sh

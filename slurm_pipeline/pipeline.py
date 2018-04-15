@@ -35,7 +35,7 @@ class SlurmPipeline(SlurmPipelineBase):
     @staticmethod
     def checkSpecification(specification):
         """
-        Check an execution specification is syntactically as expected.
+        Check an execution specification is as expected.
 
         @param specification: A C{dict} containing an execution specification.
         @raise SpecificationError: if there is anything wrong with the
@@ -214,9 +214,10 @@ class SlurmPipeline(SlurmPipelineBase):
         if taskDependencies:
             if 'collect' in step:
                 # This step is a 'collector'. I.e., it is dependent on all
-                # tasks from all its dependencies and cannot run until they
-                # have all finished. We will only run the script once, and tell
-                # it about all job ids for all tasks that are depended on.
+                # tasks from all its dependent steps and cannot run until
+                # they have all finished. We will only run the script once,
+                # and tell it about all job ids for all tasks that are
+                # depended on.
                 env = environ.copy()
                 env['SP_ORIGINAL_ARGS'] = scriptArgsStr
                 env['SP_SIMULATE'] = str(int(simulate))
@@ -249,24 +250,24 @@ class SlurmPipeline(SlurmPipelineBase):
             # Either this step has no dependencies or the steps it is
             # dependent on did not start any tasks.
             env = environ.copy()
+
+            if startAfter:
+                dependencies = separator.join(
+                    sorted(('%s:%d' % (after, jobId)) for jobId in startAfter))
+                env['SP_DEPENDENCY_ARG'] = '--dependency=' + dependencies
+            else:
+                env.pop('SP_DEPENDENCY_ARG', None)
+
             if 'dependencies' in step:
                 # The step has dependencies, but the dependent steps did
                 # not start any tasks. Run the step as though there were no
                 # dependencies.
                 args = []
-                env.pop('SP_DEPENDENCY_ARG', None)
             else:
                 # The step has no dependencies. Run it with the original
                 # command line arguments and put any --startAfter job ids
                 # into the SP_DEPENDENCY_ARG environment variable.
                 args = [] if scriptArgs is None else list(map(str, scriptArgs))
-                if startAfter:
-                    dependencies = ','.join(
-                        sorted(('afterany:%d' % jobId)
-                               for jobId in startAfter))
-                    env['SP_DEPENDENCY_ARG'] = '--dependency=' + dependencies
-                else:
-                    env.pop('SP_DEPENDENCY_ARG', None)
 
             env['SP_ORIGINAL_ARGS'] = scriptArgsStr
             env['SP_SIMULATE'] = str(int(simulate))
@@ -368,10 +369,6 @@ class SlurmPipeline(SlurmPipelineBase):
                         'Nice (priority) value %r is outside the allowed '
                         '[%d, %d] range' %
                         (nice, self.NICE_HIGHEST, self.NICE_LOWEST))
-
-        if lastStep is not None and lastStep not in steps:
-            raise SchedulingError(
-                'Last step %r not found in specification' % lastStep)
 
         for step in steps.values():
             if step['name'] == firstStep:
