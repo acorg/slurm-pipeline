@@ -32,7 +32,7 @@ parser.add_argument(
 
 parser.add_argument(
     '--firstStep', metavar='step-name',
-    help=('The name of the first specification step to execute. Earlier '
+    help=('The name of the first pipeline step to execute. Earlier '
           'steps will actually be executed but they will have SP_SIMULATE=1 '
           'in their environment, allowing them to skip doing actual work '
           '(while still emitting task names without job numbers so that '
@@ -40,13 +40,13 @@ parser.add_argument(
 
 parser.add_argument(
     '--lastStep', metavar='step-name',
-    help=('The name of the last specification step to execute. See the '
+    help=('The name of the last pipeline step to execute. See the '
           'help text for --first-step for how this affects the environment '
           'in which step scripts are executed.'))
 
 parser.add_argument(
     '--skip', metavar='step-name', action='append',
-    help='Name a step that should be skipped. May be repeated.')
+    help='Name a pipeline step that should be skipped. May be repeated.')
 
 parser.add_argument(
     '--sleep', type=float, default=0.0,
@@ -60,7 +60,7 @@ parser.add_argument(
     '--startAfter', nargs='*',
     help=('Give a list of SLURM job ids that must complete (in any state - '
           'either successfully or in error) before the initial step(s), '
-          'i.e., those with no dependencies, in the current specification may '
+          'i.e., those with no dependencies, in the current pipeline may '
           'begin.'))
 
 parser.add_argument(
