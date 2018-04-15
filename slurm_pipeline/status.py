@@ -220,6 +220,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
 
         result.extend([
             '  Collect step: %s' % step.get('collect', 'False'),
+            '  Error step: %s' % step.get('error step', 'False'),
             '  Working directory: %s' % step.get('cwd', '.'),
             '  Scheduled at: %s' % secondsToTime(step['scheduledAt']),
             '  Script: %s' % step['script'],

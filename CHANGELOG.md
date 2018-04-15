@@ -1,3 +1,8 @@
+## Version 2.0.9 - April 16, 2018
+
+Added "error step" setting to per-step information printed by
+`slurm-pipeline-status.py`.
+
 ## Version 2.0.8 - April 15, 2018
 
 Added JobName to list of default job status fields printed by
