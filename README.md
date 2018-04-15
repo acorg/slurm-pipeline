@@ -4,6 +4,8 @@ A [Python](https://www.python.org) class for scheduling and examining
 [SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
+![travis](https://travis-ci.org/acorg/slurm-pipeline.svg?branch=master)
+
 Runs under Python 2.7, 3.5, 3.6, and [pypy](http://pypy.org/) 5.10.0.
 [Change log](CHANGELOG.md).
 
