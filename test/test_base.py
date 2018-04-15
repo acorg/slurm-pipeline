@@ -29,15 +29,15 @@ class TestSlurmPipelineBase(TestCase):
         data = ''
         mockOpener = mockOpen(read_data=data)
         with patch.object(builtins, 'open', mockOpener):
-            if PY3:
-                error = '^Expecting value: line 1 column 1 \(char 0\)$'
-                assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
-                                  'file')
-            elif PYPY:
+            if PYPY:
                 # Don't try to get the pypy error messages right. They're
                 # different under different pypy versions and on my local
                 # machine.
                 self.assertRaises(ValueError, SlurmPipelineBase, 'file')
+            elif PY3:
+                error = '^Expecting value: line 1 column 1 \(char 0\)$'
+                assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
+                                  'file')
             else:
                 error = '^No JSON object could be decoded$'
                 assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
@@ -51,16 +51,16 @@ class TestSlurmPipelineBase(TestCase):
         data = '{'
         mockOpener = mockOpen(read_data=data)
         with patch.object(builtins, 'open', mockOpener):
-            if PY3:
-                error = ('^Expecting property name enclosed in double '
-                         'quotes: line 1 column 2 \(char 1\)$')
-                assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
-                                  'file')
-            elif PYPY:
+            if PYPY:
                 # Don't try to get the pypy error messages right. They're
                 # different under different pypy versions and on my local
                 # machine.
                 self.assertRaises(ValueError, SlurmPipelineBase, 'file')
+            elif PY3:
+                error = ('^Expecting property name enclosed in double '
+                         'quotes: line 1 column 2 \(char 1\)$')
+                assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
+                                  'file')
             else:
                 error = '^Expecting object: line 1 column 1 \(char 0\)$'
                 assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
