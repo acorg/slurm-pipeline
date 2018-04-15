@@ -32,9 +32,3 @@ Other changes
   if `--startAfter` is used when invoking `slurm-pipeline.py`.
 * The all-step summary section of the `slurm-pipeline-status.py` output is
   slightly improved, to list an overall count of jobs started and finished.
-
-This one will go away?
-
-* `slurm-pipeline.py` now puts the name of the invoking user in its JSON,
-  and `slurm-pipeline-status.py` uses the username when calling `sacct` to
-  get job status.
