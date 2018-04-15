@@ -57,13 +57,16 @@ args = parser.parse_args()
 status = SlurmPipelineStatus(args.specification, fieldNames=args.fieldNames)
 
 if args.printFinal:
-    print('\n'.join(map(str, status.finalJobs())))
-
+    jobs = status.finalJobs()
+    if jobs:
+        print('\n'.join(map(str, jobs)))
 elif args.printFinished:
-    print('\n'.join(map(str, status.finishedJobs())))
-
+    jobs = status.finishedJobs()
+    if jobs:
+        print('\n'.join(map(str, jobs)))
 elif args.printUnfinished:
-    print('\n'.join(map(str, status.unfinishedJobs())))
-
+    jobs = status.unfinishedJobs()
+    if jobs:
+        print('\n'.join(map(str, jobs)))
 else:
     print(status.toStr())
