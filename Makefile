@@ -1,7 +1,9 @@
+# To make the targets below, you should first run pip install requirements-dev.txt
+
 .PHONY: check, tcheck, examples-test, pycodestyle, pyflakes, lint, wc, clean, clobber, upload
 
 check:
-	python -m discover -v
+	pytest
 
 tcheck:
 	trial --rterrors test
@@ -25,8 +27,9 @@ wc:
 
 clean:
 	find . \( -name '*.pyc' -o -name '*~' \) -print0 | xargs -0 rm
-	find . -name '__pycache__' -type d -print0 | xargs -0 rmdir
-	find . -name '_trial_temp' -type d -print0 | xargs -0 rm -r
+	find . -name __pycache__ -type d -print0 | xargs -0 rmdir
+	find . -name _trial_temp -type d -print0 | xargs -0 rm -r
+	find . -name .pytest_cache -type d -print0 | xargs -0 rm -r
 	python setup.py clean
 	rm -fr slurm_pipeline.egg-info dist
 	make -C examples/word-count $@
