@@ -1,4 +1,8 @@
-## Version 2.0.0 - April 15, 2018
+## Version 2.0.6 - April 15, 2018
+
+Added "Collect step:" to per-step output of `slurm-pipeline-status.py`.
+
+## Version 2.0.5 - April 15, 2018
 
 ### sacct now used instead of squeue
 

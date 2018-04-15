@@ -219,6 +219,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             append('  No tasks emitted by this step')
 
         result.extend([
+            '  Collect step: %s' % step.get('collect', 'False'),
             '  Working directory: %s' % step.get('cwd', '.'),
             '  Scheduled at: %s' % secondsToTime(step['scheduledAt']),
             '  Script: %s' % step['script'],

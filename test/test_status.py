@@ -874,6 +874,7 @@ Steps summary:
 Step 1: start
   No dependencies.
   No tasks emitted by this step
+  Collect step: False
   Working directory: 00-start
   Scheduled at: 2016-12-10 14:20:59
   Script: 00-start/start.sh
@@ -888,6 +889,7 @@ Step 2: split
       chunk-aaaaa
       chunk-aaaab
       chunk-aaaac
+  Collect step: False
   Working directory: 01-split
   Scheduled at: 2016-12-10 14:21:04
   Script: 01-split/sbatch.sh
@@ -910,6 +912,7 @@ Step 3: blastn
         Job 4416232: State=COMPLETED, Elapsed=04:02:00, Nodelist=cpu-6
       chunk-aaaac
         Job 4416233: State=COMPLETED, Elapsed=04:12:00, Nodelist=cpu-7
+  Collect step: False
   Working directory: 02-blastn
   Scheduled at: 2016-12-10 14:22:02
   Script: 02-blastn/sbatch.sh
@@ -932,6 +935,7 @@ finished
     Tasks:
       panel
         Job 4417615: State=COMPLETED, Elapsed=04:11:00, Nodelist=cpu-8
+  Collect step: True
   Working directory: 03-panel
   Scheduled at: 2016-12-10 14:22:02
   Script: 03-panel/sbatch.sh
@@ -950,6 +954,7 @@ finished
     Tasks:
       stop
         Job 4417616: State=RUNNING, Elapsed=04:32:00, Nodelist=cpu-3
+  Collect step: False
   Working directory: 04-stop
   Scheduled at: 2016-12-10 14:22:02
   Script: 04-stop/sbatch.sh
@@ -1019,6 +1024,7 @@ Steps summary:
 Step 1: start-step
   No dependencies.
   No tasks emitted by this step
+  Collect step: False
   Working directory: 00-start
   Scheduled at: 2016-12-10 14:20:59
   Script: 00-start/start.sh
