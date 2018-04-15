@@ -862,6 +862,7 @@ This code was originally written (and is maintained) by
 
 Contributions have been received from:
 
+* [bestdevev](https://github.com/bestdevev)
 * [Eric Müller (@muffgaga)](https://github.com/muffgaga)
 * [healther](https://github.com/healther)
 * [ldynia](https://github.com/ldynia)
