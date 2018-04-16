@@ -8,11 +8,15 @@ Runs under Python 2.7, 3.5, 3.6, 3.7-dev, and [pypy](http://pypy.org/)
 [Change log](CHANGELOG.md).
 [![Build Status](https://travis-ci.org/acorg/slurm-pipeline.svg?branch=master)](https://travis-ci.org/acorg/slurm-pipeline)
 
-Funding for the development of this package comes from the European Union
-Horizon 2020 research and innovation programme,
-[COMPARE](http://www.compare-europe.eu/) grant (agreement No. 643476)
-and the [Biomedical Advanced Research and Development
-Authority](https://www.phe.gov/about/BARDA/Pages/default.aspx).
+Funding for the development of this package comes from:
+
+* the European Union Horizon 2020 research and innovation programme,
+  [COMPARE](http://www.compare-europe.eu/) grant (agreement No. 643476),
+  and
+* U.S. Federal funds from the Department of Health and Human Services;
+  Office of the Assistant Secretary for Preparedness and Response;
+  Biomedical Advanced Research and Development Authority, under Contract
+  No. HHSO100201500033C
 
 ## Installation
 

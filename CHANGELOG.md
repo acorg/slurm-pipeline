@@ -1,3 +1,7 @@
+## Version 2.0.10 - April 16, 2018
+
+Updated funding acknowledgements in README.md
+
 ## Version 2.0.9 - April 16, 2018
 
 Added "error step" setting to per-step information printed by
