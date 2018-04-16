@@ -10,3 +10,5 @@ python:
   - "pypy3"
 script:
   - pytest
+notifications:
+  irc: "irc.freenode.net#acorg"

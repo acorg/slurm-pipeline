@@ -1,3 +1,7 @@
+## Version 2.0.11 - April 16, 2018
+
+Added Travis CI build messaging to IRC.
+
 ## Version 2.0.10 - April 16, 2018
 
 Updated funding acknowledgements in README.md
