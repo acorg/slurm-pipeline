@@ -779,14 +779,17 @@ generating two new ones. The initial tasks are absorbed because the
 Use `make` to run the example. Then look at the files in the `output`
 directory. Run `make clean` to clean up.
 
-### A more realistic example
+### A real-life example
 
-Another example can be seen in another of my repos,
-[eske-pipeline-spec](https://github.com/acorg/eske-pipeline-spec). You wont
-be able to run that example unless you have various bioinformatics tools
-installed. But it may be instructive to look at the specification file and
-the scripts. The scripts use `sbatch`, unlike those (described above) in
-the `examples` directory.
+A much more realistic example pipeline can be seen in another of my repos,
+[neo-pipeline-spec](https://github.com/acorg/neo-pipeline). You wont be
+able to run that example unless you have various bioinformatics tools
+installed. But it should be instructive to look at the specification file
+and the scripts. The scripts use `sbatch` to submit SLURM jobs, unlike
+those (described above) in the `examples` directory. Note the treatment of
+the various `SP_*` variables in the `sbatch.sh` scripts and also the
+conditional setting of `--exclusive` depending on whether steps are being
+simulated or not.
 
 ## Limitations
 
