@@ -69,13 +69,17 @@ parser.add_argument(
           'priority) to 10000 (lowest priority). Note that only privileged '
           'users can specify a negative adjustment.'))
 
-parser.add_argument(
+output_arg = parser.add_argument(
     '--output', '-o', default=sys.stdout,
     type=argparse.FileType('w'), nargs='?',
     help=('The name of the file to write the pipeline status to (in JSON '
           'format). Default is standard output.'))
 
 args, scriptArgs = parser.parse_known_args()
+if '--outputSpecification' in scriptArgs:
+    raise argparse.ArgumentError(output_arg, 'The argument '
+            '"--outputSpecification" was deprecated and replaced by '
+            '-o|--output')
 
 sp = SlurmPipeline(args.specification)
 
