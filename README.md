@@ -65,10 +65,10 @@ The `bin` directory of this repo contains the following Python scripts:
   finished). See below for more information.
 * `slurm-pipeline-version.py` prints the version number.
 
-## Specification
+## Pipeline specification
 
-A run is scheduled according to a pipeline specification file in JSON
-format which is given to `slurm-pipeline.py`. Several examples of these can
+A pipeline run is scheduled according to a specification file in JSON
+format which is passed to `slurm-pipeline.py`. Several examples of these can
 be found under [`examples`](examples). Here's the one from
 [`examples/word-count/specification.json`](examples/word-count/specification.json):
 
@@ -94,16 +94,17 @@ be found under [`examples`](examples). Here's the one from
 }
 ```
 
-The specification above contains almost everything you need to know to set
-up your own pipeline. You still have to write the scripts though, of
+The example specification above contains most of what you need to know to
+set up your own pipeline. You'll still have to write the scripts though, of
 course.
 
 ## Steps
 
 A pipeline run is organized into a series of conceptual *steps*. These are
-run in the order they appear in the specification file. Step scripts will
-typically use the SLURM [`sbatch`](https://slurm.schedmd.com/sbatch.html)
-command to schedule the later execution of other programs.
+processed in the order they appear in the specification file. Step scripts
+will typically use the SLURM
+[`sbatch`](https://slurm.schedmd.com/sbatch.html) command to schedule the
+later execution of other programs.
 
 Each step must contain a `name` key. Names must be unique.
 
@@ -124,28 +125,33 @@ href="#directives">below</a>.
 
 ## Tasks
 
-A step script may emit one or more *task*s. It does this by writing lines
-such as `TASK: xxx 39749 39750` to its standard output. This indicates that
-a task named `xxx` has been scheduled and that two SLURM jobs (with ids
-`39749` and `39750`) have been scheduled (via `sbatch`) to complete
-whatever work is needed for the task.
+A step script may emit one or more *task*s. A task is really nothing more
+than the name of a piece of work that is passed to successive (dependent)
+scripts in the pipeline. The task name might correspond to a file, to an
+entry in a database, to a URL - whatever it is that your scripts need to be
+passed so they can do their work.
 
-A task name may be emitted multiple times by the same script.
+The script lets `slurm-pipeline.py` know about tasks by printing lines such
+as `TASK: xxx 39749 39750` to its standard output. In this example, the
+script is indicating that a task named `xxx` has been scheduled and that
+two SLURM jobs (with ids `39749` and `39750`) have been scheduled (via
+`sbatch`) to complete whatever work is needed for the task.
 
 Any other output from a step script is ignored (it is however stored in the
-JSON output produced by `slurm-pipeline.py` when using Python version 3).
+JSON output produced by `slurm-pipeline.py`, provided you are using Python
+version 3).
 
 When a step depends on an earlier step (or steps), its `script` will be
-called with a single argument: the name of a task emitted by the script for
-an earlier step. If a step depends on multiple earlier steps that each emit
-the same task name, the script will only be called once, with that task
-name as an argument, once all the jobs from all the dependent steps have
-finished.
+called with a single argument: the name of a task emitted by the script of
+the earlier step(s). If a step depends on multiple earlier steps that each
+emit the same task name, the script will only be called once, with that
+task name as an argument, once all the jobs from all the dependent steps
+have finished.
 
 So, for example, a step that starts the processing of 10 FASTA files could
-emit the file names (i.e., as task names). This will cause ten subsequent
+just use the file names as task names. This will cause ten subsequent
 invocations of any dependent step's script, called with each of the task
-names.
+names (i.e., the file names in this example).
 
 If a script emits `TASK: xxx` with no job id(s), the named task will be
 passed along the pipeline but dependent steps will not need to wait for any
@@ -221,6 +227,9 @@ the `word-count` example below for sample output.
   run and give those job ids to a subsequent invocation of
   `slurm-pipeline.py` (see `slurm-pipeline-status.py` below for an
   example).
+* `--scriptArgs`: Specify arguments that should appear on the command line
+  when initial step scripts are run. The initial steps are those that do
+  not have any dependencies.
 
 Note that all script steps are *always* executed, including when
 `--firstStep` or `--skip` are used. See below for the reasoning behind
@@ -285,8 +294,12 @@ You've already seen most of the specification file directives above. Here's
 the full list:
 
 * `name`: the name of the step (required).
-* `script`: the script to run (required). If given as a relative path, it must
-   be relative to the `cwd` specification, if any.
+* `script`: the script to run (required). If given as a relative path, it
+   must be relative to the `cwd` specification, if any. Note that if your
+   script value does not contain a `/` and you do not have `.` in your
+   shell's `PATH` variable you will need to specify your script with a
+   leading `./` (e.g., `./scriptname.sh`) or it will not be found (by
+   Python's `subprocess` module).
 * `cwd`: the directory to run the script in. If no directory is given, the
    script will be run in the directory where you invoke
    `slurm-pipeline.py`.
@@ -294,7 +307,12 @@ the full list:
   prerequisites have completed.
 * `dependencies`: a list of previous steps that a step depends on.
 * `error step`: if `true` the step script will only be run if one of its
-  dependencies fails.
+  dependencies fails. Making a step an error step results in
+  `--dependency=afternotok:JOBID` being put into the `SP_DEPENDENCY_ARG`
+  environment variable your step scripts will receive (see below). You will
+  need a recent version of SLURM installed to be able to use error steps.
+  Check the `--dependencies` option in `man sbatch` to make sure
+  `afternotok` is supported.
 * `skip`: if `true`, the step script will be run with `SP_SKIP=1` in its
   environment. Otherwise, `SP_SKIP` will always be set and will be `0`.
 
@@ -303,13 +321,18 @@ the full list:
 The following environment variables are set when a step's script is
 executed:
 
-* `SP_ORIGINAL_ARGS` contains the (space-separated) list of arguments
-  originally passed to `slurm-pipeline.py`. Most scripts will not need to
-  know this information, but it might be useful. Scripts that have no
-  dependencies will be run with these arguments on the command line too.
-  Note that if an original command-line argument contained a space, and you
-  split `SP_ORIGINAL_ARGS` on spaces, you'll have two strings instead of
-  one.
+* `SP_ORIGINAL_ARGS` will contain the (space-separated) list of arguments
+  originally passed to `slurm-pipeline.py` using the `--scriptArgs`
+  argument. Most scripts will not need to know this information, but it
+  might be useful. Scripts for initial steps (those that have no
+  dependencies) will be run with these arguments on the command line.  Note
+  that if an original command-line argument contained a space (or shell
+  metacharacter), and you split `SP_ORIGINAL_ARGS` on spaces, you'll have
+  two strings instead of one (or other unintended result). For this reason,
+  `SP_ORIGINAL_ARGS` has each argument wrapped in single quotes. The best
+  way to process this variable (in `bash`) is to use `eval set
+  "$SP_ORIGINAL_ARGS"` and then examine `$1`, `$2`, etc. It is currently not
+  possible to pass an argument containing a single quote to a step script.
 * `SP_FORCE` will be set to `1` if `--force` is given on the
   `slurm-pipeline.py` command line. This can be used to inform step scripts
   that they may overwrite pre-existing result files if they wish. If
@@ -361,10 +384,10 @@ the SLURM job id.
 <a id="separation"></a>
 ## Separation of concerns
 
-`slurm-pipeline.py` doesn't interact with SLURM at all. Actually, the
-*only* things it knows about SLURM is how to construct dependency and nice
-arguments for `sbatch` (so it could in theory be generalized to support
-other workload managers).
+`slurm-pipeline.py` doesn't actually interact with SLURM at all. Actually,
+the *only* things it knows about SLURM is how to construct `--dependency`
+and `--nice` arguments for `sbatch`. The `slurm-pipeline-status.py` command
+will however run `sacct` to get job status information.
 
 To use `slurm-pipeline.py` you need to make a specification file such as
 the one above to indicate the steps in your pipeline, their scripts, and
@@ -690,7 +713,22 @@ The `examples/word-count-with-skipping` example is exactly the same as
 that filters out short words. If you execute `make run` in that directory,
 you'll see `slurm-pipeline.py` called with `--skip long-words`. The
 resulting `output/MOST-FREQUENT-WORDS` output file contains typical
-freqeunt (short) English words such as `the`, `and`, etc.
+frequent (short) English words such as `the`, `and`, etc.
+
+`make run` actually runs the following command:
+
+```
+$ slurm-pipeline.py -s specification.json texts/*.txt > output/status.json
+```
+
+If you look in `output/status.json` you'll see JSON that holds information
+about the pipeline submission. This is all the information that was in the
+specification file (`specification.json`) plus the submission time,
+arguments, job ids, script output, etc. In a real scenario (i.e., when
+SLURM is actually invoked, not in this trivial example) you can give this
+status file to `slurm-pipeline-status.py` and it will print it in a
+readable form and also look up (using the `sacct` command) the status of
+all the SLURM jobs that were submitted by your pipeline scripts.
 
 ### Simulated BLAST
 
@@ -865,6 +903,7 @@ This code was originally written (and is maintained) by
 
 Contributions have been received from:
 
+* [akug](https://github.com/akug)
 * [bestdevev](https://github.com/bestdevev)
 * [Eric Müller (@muffgaga)](https://github.com/muffgaga)
 * [healther](https://github.com/healther)

@@ -2,27 +2,27 @@
     "steps": [
         {
             "name": "start-log",
-            "script": "0-start-log.sh"
+            "script": "./0-start-log.sh"
         },
         {
             "name": "split",
-            "script": "1-split-fasta.sh"
+            "script": "./1-split-fasta.sh"
         },
         {
             "dependencies": ["split"],
             "name": "blast",
-            "script": "2-run-blast.sh"
+            "script": "./2-run-blast.sh"
         },
         {
             "collect": true,
             "dependencies": ["blast"],
             "name": "collect",
-            "script": "3-collect.sh"
+            "script": "./3-collect.sh"
         },
         {
             "dependencies": ["collect"],
             "name": "end",
-            "script": "4-end-log.sh"
+            "script": "./4-end-log.sh"
         }
     ]
 }

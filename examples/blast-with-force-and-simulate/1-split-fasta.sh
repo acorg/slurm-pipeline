@@ -1,11 +1,11 @@
 #!/bin/bash
 
 echo >> pipeline.log
-echo "In `basename $0`" >> pipeline.log
+echo "In $(basename $0)" >> pipeline.log
 echo "SP_FORCE is $SP_FORCE" >> pipeline.log
 echo "SP_SIMULATE is $SP_SIMULATE" >> pipeline.log
 
-prexistingCount=`ls x?? 2>/dev/null | wc -l | awk '{print $1}'`
+prexistingCount=$(ls x?? 2>/dev/null | wc -l | awk '{print $1}')
 echo "There are $prexistingCount pre-existing split files." >> pipeline.log
 
 if [ $SP_SIMULATE = "0" ]
@@ -19,7 +19,7 @@ then
             split -l 2 $1
         else
             echo "Will not overwrite pre-existing split files. Use --force to make me." >> pipeline.log
-            echo "`basename $0`: Will not overwrite pre-existing split files. Use --force to make me." >&2
+            echo "$(basename $0): Will not overwrite pre-existing split files. Use --force to make me." >&2
         fi
     else
         echo "No pre-existing split files exist, splitting." >> pipeline.log

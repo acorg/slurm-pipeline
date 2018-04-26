@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo >> pipeline.log
-echo "In `basename $0` $@" >> pipeline.log
+echo "In $(basename $0) $@" >> pipeline.log
 echo "SP_FORCE is $SP_FORCE" >> pipeline.log
 echo "SP_SIMULATE is $SP_SIMULATE" >> pipeline.log
 
@@ -11,7 +11,7 @@ echo "SP_SIMULATE is $SP_SIMULATE" >> pipeline.log
 # $2 is given to us by run-blast.sh (it's one of the x?? FASTA files). Pull
 # out the query id so we can make fake BLAST output for it.
 task=$2
-queryId=`head -n 1 $task | cut -c2-`
+queryId=$(head -n 1 $task | cut -c2-)
 
 out=$task.blast-out
 
