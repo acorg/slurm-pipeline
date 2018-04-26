@@ -4,7 +4,7 @@ task=$1
 log=output/$task.log
 
 echo >> $log
-echo "Running `basename $0` $@" >> $log
+echo "Running $(basename $0) $@" >> $log
 
 # Log to a file just for this species, since all species jobs are running
 # in parallel.
@@ -16,4 +16,4 @@ awk '{sum += $1} END {print NR, sum}' < data/$task > output/$task.result
 
 echo TASK: $task
 
-echo "Finished `basename $0`" >> $log
+echo "Finished $(basename $0)" >> $log

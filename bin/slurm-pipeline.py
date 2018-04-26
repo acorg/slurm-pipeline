@@ -12,6 +12,7 @@ from __future__ import print_function
 import sys
 import os
 import argparse
+from itertools import chain
 
 from slurm_pipeline import SlurmPipeline
 
@@ -75,11 +76,29 @@ parser.add_argument(
     help=('The name of the file to write the pipeline status to (in JSON '
           'format). Default is standard output.'))
 
-args, scriptArgs = parser.parse_known_args()
+parser.add_argument(
+    '--scriptArgs', nargs='+', action='append',
+    help=('Specify arguments to be passed to the scripts for initial '
+          'pipeline steps. Initial steps are those that have no dependencies '
+          'in the JSON specification.'))
+
+args = parser.parse_args()
 
 sp = SlurmPipeline(args.specification)
 
 startAfter = list(map(int, args.startAfter)) if args.startAfter else None
+
+if args.scriptArgs:
+    # Flatten lists of lists that we get from using both nargs='+' and
+    # action='append'. We use both because it allows people to use
+    # --scriptArgs on the command line either via "--scriptArgs arg1
+    # --scriptArgs arg2 or "--scriptArgs arg1 arg2", or a combination of
+    # these. That way it's not necessary to remember which way you're
+    # supposed to use it and you can't be hit by the subtle problem
+    # encountered in https://github.com/acorg/dark-matter/issues/453
+    scriptArgs = list(chain.from_iterable(args.scriptArgs))
+else:
+    scriptArgs = None
 
 status = sp.schedule(
     force=args.force, firstStep=args.firstStep, lastStep=args.lastStep,

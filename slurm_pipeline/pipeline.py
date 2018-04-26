@@ -198,6 +198,20 @@ class SlurmPipeline(SlurmPipelineBase):
         step['simulate'] = simulate
         step['skip'] = skip
         scriptArgsStr = ' '.join(map(str, scriptArgs)) if scriptArgs else ''
+        if scriptArgs:
+            # Single quote each script arg so shell metacharacters and
+            # whitespace are preserved.
+            args = []
+            for arg in map(str, scriptArgs):
+                if "'" in arg:
+                    raise SchedulingError(
+                        'Script argument "%s" contains a single quote, which '
+                        'is currently not supported.' % arg)
+                else:
+                    args.append("'%s'" % arg)
+            scriptArgsStr = ' '.join(args)
+        else:
+            scriptArgsStr = ''
 
         if step.get('error step', False):
             separator = '?'
@@ -315,6 +329,13 @@ class SlurmPipeline(SlurmPipelineBase):
                     "'%s'. Attempted command: '%s'. Exit status: %s."
                     % (step['name'], step['script'],  step.get('cwd', '.'),
                        e.cmd, e.returncode))
+        except OSError as e:
+            command = ' '.join([step['script']] + args)
+            raise SchedulingError(
+                "Could not execute step '%s' script '%s' in directory "
+                "'%s'. Attempted command: '%s'. Error: %s" % (
+                    step['name'], step['script'], step.get('cwd', '.'),
+                    command, e))
 
         # Look at all output lines for task names and SLURM job ids created
         # (if any) by this script. Ignore any non-matching output.

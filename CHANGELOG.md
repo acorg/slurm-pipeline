@@ -1,3 +1,11 @@
+## Version 3.0.0
+
+* Added `--scriptArgs` to `slurm-pipeline.py` to formalize giving arguments
+  on the command line that should be passed to initial step scripts (i.e.,
+  those that have no dependencies).  This prevents the possibility of
+  putting unrecognized arguments (like `--startStep`) on the command line
+  which are then passed to the script steps.
+
 ## Version 2.0.11 - April 16, 2018
 
 Added Travis CI build messaging to IRC.

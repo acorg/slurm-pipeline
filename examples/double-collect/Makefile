@@ -1,8 +1,8 @@
 .PHONY: run, clean
 
 run:
-	../../bin/slurm-pipeline.py -s specification.json > specification-post-run.json
+	../../bin/slurm-pipeline.py -s specification.json > status.json
 
 clean:
-	rm -f pipeline.log specification-post-run.json
+	rm -f pipeline.log status.json
 	rm -fr output

@@ -1000,12 +1000,39 @@ class TestSlurmPipeline(TestCase):
     @patch('subprocess.check_output')
     @patch('os.access')
     @patch('os.path.exists')
+    def testScriptArgWithSingleQuote(self, existsMock, accessMock,
+                                     subprocessMock):
+        """
+        If a script argument contains a single quote, a SchedulingError must
+        be raised.
+        """
+        subprocessMock.return_value = ''
+
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'name': 'name1',
+                        'script': 'script',
+                    },
+                ]
+            })
+        error = ("^Script argument \"don't ask me\" contains a single "
+                 "quote, which is currently not supported\.$")
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
+                          scriptArgs=["don't ask me", 3])
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
     def testScriptArgs(self, existsMock, accessMock, subprocessMock):
         """
         If script arguments are given to SlurmPipeline, they must be passed
         to the executed scripts that have no dependencies. Steps that have
         dependencies must be called with the name of the task on the command
-        line and the correct job numbers.
+        line and the correct job numbers. The script args must also appear
+        (single quoted) in the SP_ORIGINAL_ARGS variable in the environment
+        of all scripts.
         """
 
         class SideEffect(object):
@@ -1057,25 +1084,21 @@ class TestSlurmPipeline(TestCase):
         # in all calls.
         env1 = subprocessMock.mock_calls[0][2]['env']
         self.assertNotIn('SP_DEPENDENCY_ARG', env1)
-        self.assertEqual('hey 3', env1['SP_ORIGINAL_ARGS'])
-        self.assertEqual('0', env1['SP_FORCE'])
+        self.assertEqual("'hey' '3'", env1['SP_ORIGINAL_ARGS'])
 
         env2 = subprocessMock.mock_calls[1][2]['env']
         self.assertNotIn('SP_DEPENDENCY_ARG', env2)
-        self.assertEqual('hey 3', env2['SP_ORIGINAL_ARGS'])
-        self.assertEqual('0', env2['SP_FORCE'])
+        self.assertEqual("'hey' '3'", env1['SP_ORIGINAL_ARGS'])
 
         env3 = subprocessMock.mock_calls[2][2]['env']
         self.assertEqual('--dependency=afterok:127,afterok:450',
                          env3['SP_DEPENDENCY_ARG'])
-        self.assertEqual('hey 3', env3['SP_ORIGINAL_ARGS'])
-        self.assertEqual('0', env3['SP_FORCE'])
+        self.assertEqual("'hey' '3'", env1['SP_ORIGINAL_ARGS'])
 
         env4 = subprocessMock.mock_calls[3][2]['env']
         self.assertEqual('--dependency=afterok:238,afterok:560',
                          env4['SP_DEPENDENCY_ARG'])
-        self.assertEqual('hey 3', env4['SP_ORIGINAL_ARGS'])
-        self.assertEqual('0', env4['SP_FORCE'])
+        self.assertEqual("'hey' '3'", env1['SP_ORIGINAL_ARGS'])
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1856,8 +1879,8 @@ class TestSlurmPipeline(TestCase):
     @patch('os.access')
     @patch('os.path.exists')
     @patch('os.path.isdir')
-    def testSubprocessExecRaises(self, isdirMock, existsMock, accessMock,
-                                 subprocessMock):
+    def testSubprocessExecRaisesCalledProcessError(self, isdirMock, existsMock,
+                                                   accessMock, subprocessMock):
         """
         If subprocess.check_output raises CalledProcessError, we must
         raise a corresponding SchedulingError.
@@ -1887,5 +1910,34 @@ class TestSlurmPipeline(TestCase):
             error = ("^Could not execute step 'name1' script 'script1' in "
                      "directory 'dir'\. Attempted command: 'command.sh'\. "
                      "Exit status: 3\.$")
+
+        assertRaisesRegex(self, SchedulingError, error, sp.schedule)
+
+    @patch('subprocess.check_output')
+    @patch('os.access')
+    @patch('os.path.exists')
+    @patch('os.path.isdir')
+    def testSubprocessExecRaisesOSError(self, isdirMock, existsMock,
+                                        accessMock, subprocessMock):
+        """
+        If subprocess.check_output raises CalledProcessError, we must
+        raise a corresponding SchedulingError.
+        """
+        sp = SlurmPipeline(
+            {
+                'steps': [
+                    {
+                        'cwd': 'dir',
+                        'name': 'name1',
+                        'script': 'script1',
+                    },
+                ],
+            })
+
+        subprocessMock.side_effect = OSError('No such file or directory: script1')
+
+        error = ("^Could not execute step 'name1' script 'script1' in directory "
+                 "'dir'\. Attempted command: 'script1'\. Error: No such file or "
+                 "directory: script1$")
 
         assertRaisesRegex(self, SchedulingError, error, sp.schedule)
