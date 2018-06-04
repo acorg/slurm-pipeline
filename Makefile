@@ -3,10 +3,10 @@
 .PHONY: check, tcheck, examples-test, pycodestyle, pyflakes, lint, wc, clean, clobber, upload
 
 check:
-	pytest
+	env PYTHONPATH=. pytest
 
 tcheck:
-	trial --rterrors test
+	env PYTHONPATH=. trial --rterrors test
 
 examples-test:
 	make -C examples/word-count run clean
