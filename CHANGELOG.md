@@ -1,3 +1,7 @@
+## Version 3.0.1 - Juna 4, 2018
+
+Added `env PYTHONPATH=../..` to all example Makefiles.
+
 ## Version 3.0.0
 
 * Added `--scriptArgs` to `slurm-pipeline.py` to formalize giving arguments
