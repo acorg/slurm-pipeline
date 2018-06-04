@@ -1,6 +1,6 @@
 ## Version 3.0.1 - Juna 4, 2018
 
-Added `env PYTHONPATH=.` to all example Makefiles.
+Added `env PYTHONPATH=../..` to all example Makefiles.
 
 ## Version 3.0.0
 
