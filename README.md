@@ -861,6 +861,14 @@ In such cases, it may be advisable to allocate a compute node (using
 `slurm-pipeline.py` on (instead of tying up a SLURM login node), or at
 least to run `slurm-pipeline.py` using `nice`.
 
+You might also find the
+[simple SLURM loop](https://github.com/acorg/simple-slurm-loop) scripts
+useful as a way to run a slurm-pipeline repeatedly, testing after each
+iteration whether it should be rescheduled. The
+[README](https://github.com/acorg/simple-slurm-loop/blob/master/README.md)
+shows how you could do that using the `--printFinal` argument to
+`slurm-pipeline-status.py`.
+
 ## Development
 
 If you like to work on the code or just to run the tests having cloned the
