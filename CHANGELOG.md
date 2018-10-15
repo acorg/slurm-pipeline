@@ -1,4 +1,9 @@
-## Version 3.0.1 - Juna 4, 2018
+## Version 3.0.2 - October 16, 2018
+
+Added missing `--scriptArgs` to `README.md`. Thanks
+[@avatar-lavventura](https://github.com/avatar-lavventura)!
+
+## Version 3.0.1 - June 4, 2018
 
 Added `env PYTHONPATH=../..` to all example Makefiles.
 

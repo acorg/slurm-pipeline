@@ -168,7 +168,7 @@ example, given the specification above,
 
 ```sh
 $ cd examples/word-count
-$ slurm-pipeline.py -s specification.json texts/*.txt > status.json
+$ slurm-pipeline.py -s specification.json --scriptArgs texts/*.txt > status.json
 ```
 
 will cause `one-word-per-line.sh` from the first specification step to be
@@ -568,7 +568,7 @@ directory. You can run the example via
 $ cd examples/word-count
 $ make
 rm -f output/*
-../../bin/slurm-pipeline.py -s specification.json texts/*.txt > status.json
+../../bin/slurm-pipeline.py -s specification.json --scriptArgs texts/*.txt > status.json
 ```
 
 This example is more verbose in its output than would be typical. Here's
@@ -718,7 +718,7 @@ frequent (short) English words such as `the`, `and`, etc.
 `make run` actually runs the following command:
 
 ```
-$ slurm-pipeline.py -s specification.json texts/*.txt > output/status.json
+$ slurm-pipeline.py -s specification.json --scriptArgs  texts/*.txt > output/status.json
 ```
 
 If you look in `output/status.json` you'll see JSON that holds information
