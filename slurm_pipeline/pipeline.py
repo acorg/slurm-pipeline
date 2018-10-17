@@ -47,26 +47,21 @@ class SlurmPipeline(SlurmPipelineBase):
         SlurmPipelineBase.checkSpecification(specification)
 
         for count, step in enumerate(specification['steps'], start=1):
-            try:
-                cwd = step['cwd']
-            except KeyError:
-                script = step['script']
-            else:
-                if not path.isdir(cwd):
-                    raise SpecificationError(
-                        'Specification step %d specifies a working directory '
-                        '(%r) that does not exist' % (count, cwd))
+            cwd = step.get('cwd', '.')
 
-                script = step['script']
-                if not path.isabs(script):
-                    script = path.join(cwd, script)
+            if not path.isdir(cwd):
+                raise SpecificationError(
+                    'Specification step %d specifies a working directory '
+                    '(%r) that does not exist' % (count, cwd))
 
-            if not path.exists(script):
+            step['script'] = path.abspath(path.join(cwd, step['script']))
+
+            if not path.exists(step['script']):
                 raise SpecificationError(
                     'The script %r in step %d does not exist' %
                     (step['script'], count))
 
-            if not os.access(script, os.X_OK):
+            if not os.access(step['script'], os.X_OK):
                 raise SpecificationError(
                     'The script %r in step %d is not executable' %
                     (step['script'], count))
