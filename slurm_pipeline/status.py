@@ -21,7 +21,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
     def __init__(self, specification, fieldNames=None):
         SlurmPipelineBase.__init__(self, specification)
         jobIds = self.jobs() | set(self.specification['startAfter'] or ())
-        self.sacct = SAcct(self.specification, jobIds, fieldNames=fieldNames)
+        self.sacct = SAcct(jobIds, fieldNames=fieldNames)
 
     @staticmethod
     def checkSpecification(specification):

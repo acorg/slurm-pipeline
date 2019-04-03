@@ -22,16 +22,10 @@ class TestSAcct(TestCase):
         """
         subprocessMock.side_effect = OSError('No such file or directory')
         error = (
-            "^Encountered OSError \(No such file or directory\) when running "
+            r"^Encountered OSError \(No such file or directory\) when running "
             "'sacct -P --format JobId,JobName,State,Elapsed,Nodelist "
             "--jobs 35,40'$")
-        specification = {
-            'scheduledAt': 44,
-            'startAfter': None,
-            'steps': [],
-        }
-        assertRaisesRegex(self, SAcctError, error,  SAcct, specification,
-                          {35, 40})
+        assertRaisesRegex(self, SAcctError, error,  SAcct, {35, 40})
 
     @patch('subprocess.check_output')
     def testSacctCalledAsExpectedWhenNoArgsPassed(self, subprocessMock):
@@ -43,11 +37,7 @@ class TestSAcct(TestCase):
             '1|name|COMPLETED|04:32:00|cpu-3\n'
             '2|name|FAILED|05:11:37|cpu-4\n'
         )
-        SAcct({
-            'scheduledAt': 44,
-            'startAfter': None,
-            'steps': [],
-        }, {1, 2})
+        SAcct({1, 2})
         subprocessMock.assert_called_once_with(
             ['sacct', '-P', '--format', 'JobId,JobName,State,Elapsed,Nodelist',
              '--jobs', '1,2'],
@@ -66,13 +56,7 @@ class TestSAcct(TestCase):
 
         error = ('^sacct did not return information about the following job '
                  'id: 3$')
-        assertRaisesRegex(self, SAcctError, error,  SAcct,
-                          {
-                              'scheduledAt': 100,
-                              'startAfter': None,
-                              'steps': [],
-                          },
-                          {1, 2, 3})
+        assertRaisesRegex(self, SAcctError, error,  SAcct, {1, 2, 3})
 
     @patch('subprocess.check_output')
     def testSacctCalledAsExpectedWhenFieldNamesPassed(self, subprocessMock):
@@ -86,14 +70,7 @@ class TestSAcct(TestCase):
             '1|red|1968\n'
             '2|green|2011\n'
         )
-        s = SAcct(
-            {
-                'scheduledAt': 44,
-                'startAfter': None,
-                'steps': [],
-            },
-            {1, 2},
-            fieldNames='Color,Year')
+        s = SAcct({1, 2}, fieldNames='Color,Year')
         subprocessMock.assert_called_once_with(
             ['sacct', '-P', '--format', 'JobId,Color,Year', '--jobs', '1,2'],
             universal_newlines=True)
@@ -113,12 +90,7 @@ class TestSAcct(TestCase):
         )
         error = ("^Job id 1 found more than once in 'sacct -P --format "
                  "JobId,JobName,State,Elapsed,Nodelist --jobs 1' output$")
-        assertRaisesRegex(self, SAcctError, error,  SAcct,
-                          {
-                              'scheduledAt': 44,
-                              'startAfter': None,
-                              'steps': [],
-                          }, {1})
+        assertRaisesRegex(self, SAcctError, error,  SAcct, {1})
 
     @patch('subprocess.check_output')
     def testJobsDict(self, subprocessMock):
@@ -131,13 +103,7 @@ class TestSAcct(TestCase):
             '1|name1|COMPLETED|04:32:00|(none)\n'
             '2|name2|FAILED|05:11:37|cpu-4\n'
         )
-        sa = SAcct(
-            {
-                'scheduledAt': 44,
-                'startAfter': None,
-                'steps': [],
-            },
-            {1, 2})
+        sa = SAcct({1, 2})
         self.assertEqual(
             {
                 1: {
@@ -169,13 +135,7 @@ class TestSAcct(TestCase):
             '1|name1|COMPLETED|04:32:00|(none)\n'
             '2|name2|FAILED|05:11:37|cpu-4\n'
         )
-        sa = SAcct(
-            {
-                'scheduledAt': 44,
-                'startAfter': None,
-                'steps': [],
-            },
-            {1, 2})
+        sa = SAcct({1, 2})
         self.assertEqual(
             {
                 1: {
@@ -209,13 +169,7 @@ class TestSAcct(TestCase):
             '2.batch|name2|FAILED|06:11:37|cpu-5\n'
             '2|name2|FAILED|05:11:37|cpu-4\n'
         )
-        sa = SAcct(
-            {
-                'scheduledAt': 44,
-                'startAfter': None,
-                'steps': [],
-            },
-            {1, 2})
+        sa = SAcct({1, 2})
         self.assertEqual(
             {
                 1: {
@@ -245,13 +199,7 @@ class TestSAcct(TestCase):
             '2|name|FAILED|05:11:37|cpu-4\n'
             '3|name|FINISHED|05:13:00|cpu-6\n'
         )
-        sa = SAcct(
-            {
-                'scheduledAt': 100,
-                'startAfter': None,
-                'steps': [],
-            },
-            {1, 2, 3})
+        sa = SAcct({1, 2, 3})
         self.assertEqual(
             'JobName=name, State=COMPLETED, Elapsed=04:32:00, Nodelist=cpu-3',
             sa.summarize(1))
@@ -272,14 +220,7 @@ class TestSAcct(TestCase):
             'JobID|State|Elapsed|Nodelist\n'
             '1|COMPLETED|04:32:00|cpu-3\n'
         )
-        sa = SAcct(
-            {
-                'scheduledAt': 100,
-                'startAfter': None,
-                'steps': [],
-            },
-            {1},
-            fieldNames='STATE,eLAPSED,Nodelist')
+        sa = SAcct({1}, fieldNames='STATE,eLAPSED,Nodelist')
         self.assertEqual('STATE=COMPLETED, eLAPSED=04:32:00, Nodelist=cpu-3',
                          sa.summarize(1))
 
@@ -293,13 +234,7 @@ class TestSAcct(TestCase):
             '1|name|RUNNING|04:32:00|(none)\n'
             '2|name|FAILED|05:11:37|cpu-4\n'
         )
-        sa = SAcct(
-            {
-                'scheduledAt': 44,
-                'startAfter': None,
-                'steps': [],
-            },
-            {1, 2})
+        sa = SAcct({1, 2})
         self.assertFalse(sa.finished(1))
         self.assertTrue(sa.finished(2))
 
@@ -313,13 +248,7 @@ class TestSAcct(TestCase):
             '1|name|COMPLETED|04:32:00|(none)\n'
             '2|name|FAILED|05:11:37|cpu-4\n'
         )
-        sa = SAcct(
-            {
-                'scheduledAt': 44,
-                'startAfter': None,
-                'steps': [],
-            },
-            {1, 2})
+        sa = SAcct({1, 2})
         self.assertFalse(sa.failed(1))
         self.assertTrue(sa.failed(2))
 
@@ -333,13 +262,7 @@ class TestSAcct(TestCase):
             '1|name|RUNNING|04:32:00|(none)\n'
             '2|name|COMPLETED|05:11:37|cpu-4\n'
         )
-        sa = SAcct(
-            {
-                'scheduledAt': 44,
-                'startAfter': None,
-                'steps': [],
-            },
-            {1, 2})
+        sa = SAcct({1, 2})
         self.assertFalse(sa.completed(1))
         self.assertTrue(sa.completed(2))
 
@@ -353,12 +276,6 @@ class TestSAcct(TestCase):
             '1|name|RUNNING|04:32:00|(none)\n'
             '2|name|COMPLETED|05:11:37|cpu-4\n'
         )
-        sa = SAcct(
-            {
-                'scheduledAt': 44,
-                'startAfter': None,
-                'steps': [],
-            },
-            {1, 2})
+        sa = SAcct({1, 2})
         self.assertEqual('RUNNING', sa.state(1))
         self.assertTrue('COMPLETED', sa.state(2))

@@ -1,3 +1,7 @@
+## Version 3.1.0 - April 4, 2019
+
+Removed unused `specification` argument to `SAcct` class.
+
 ## Version 3.0.2 - October 16, 2018
 
 Added missing `--scriptArgs` to `README.md`. Thanks

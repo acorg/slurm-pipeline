@@ -9,11 +9,8 @@ class SAcct(object):
     """
     Fetch information about job id status from sacct.
 
-    @param specification: A C{dict} containing an execution specification.
-    @param jobIdsOfInterest: A C{set} of C{int} job ids that are relevant to
-        this specification. This is the union of jobs emitted when the
-        specification was run and the job ids (if any) given on the command
-        line via --startAfter.
+    @param jobIdsOfInterest: A C{set} of C{int} job ids to retrieve
+        accounting information for.
     @param fieldNames: A C{list} of C{str} job field names to obtain from
         sacct. If C{None}, C{self.DEFAULT_FIELD_NAMES} will be used. See man
         sacct for the full list of possible field names.
@@ -21,7 +18,7 @@ class SAcct(object):
 
     DEFAULT_FIELD_NAMES = 'JobName,State,Elapsed,Nodelist'
 
-    def __init__(self, specification, jobIdsOfInterest, fieldNames=None):
+    def __init__(self, jobIdsOfInterest, fieldNames=None):
         self.fieldNames = (fieldNames or environ.get('SP_STATUS_FIELD_NAMES')
                            or self.DEFAULT_FIELD_NAMES)
         args = [
