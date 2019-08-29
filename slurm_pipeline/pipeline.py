@@ -136,7 +136,7 @@ class SlurmPipeline(SlurmPipelineBase):
 
         environ['SP_FORCE'] = str(int(force))
         environ['SP_NICE_ARG'] = (
-            '--nice' if nice is None else '--nice %d' % nice)
+            '--nice' if nice is None else '--nice=%d' % nice)
         firstStepFound = lastStepFound = False
 
         for stepIndex, stepName in enumerate(steps):

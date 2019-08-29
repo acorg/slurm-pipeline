@@ -1,3 +1,9 @@
+# Version 3.1.1 - August 29, 2019
+
+The `--nice` argument put into the `SP_NICE_ARG` environment variable
+changed to be e.g., `--nice=50` (used to be `--nice 50` which causes
+`sbatch` to complain "sbatch: error: Unable to open file 50").
+
 ## Version 3.1.0 - April 4, 2019
 
 Removed unused `specification` argument to `SAcct` class.
