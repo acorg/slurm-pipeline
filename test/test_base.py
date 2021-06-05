@@ -1,4 +1,6 @@
 from unittest import TestCase
+from unittest.mock import patch, mock_open
+
 from six.moves import builtins
 from six import assertRaisesRegex, PY3
 from json import dumps
@@ -6,13 +8,6 @@ import platform
 
 from slurm_pipeline.base import SlurmPipelineBase
 from slurm_pipeline.error import SpecificationError
-
-try:
-    from unittest.mock import patch
-except ImportError:
-    from mock import patch
-
-from .mocking import mockOpen
 
 PYPY = platform.python_implementation() == 'PyPy'
 
@@ -27,15 +22,14 @@ class TestSlurmPipelineBase(TestCase):
         If the specification file is empty, a ValueError must be raised.
         """
         data = ''
-        mockOpener = mockOpen(read_data=data)
-        with patch.object(builtins, 'open', mockOpener):
+        with patch.object(builtins, 'open', mock_open(read_data=data)):
             if PYPY:
                 # Don't try to get the pypy error messages right. They're
                 # different under different pypy versions and on my local
                 # machine.
                 self.assertRaises(ValueError, SlurmPipelineBase, 'file')
             elif PY3:
-                error = '^Expecting value: line 1 column 1 \(char 0\)$'
+                error = r'^Expecting value: line 1 column 1 \(char 0\)$'
                 assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
                                   'file')
             else:
@@ -49,20 +43,19 @@ class TestSlurmPipelineBase(TestCase):
         must be raised.
         """
         data = '{'
-        mockOpener = mockOpen(read_data=data)
-        with patch.object(builtins, 'open', mockOpener):
+        with patch.object(builtins, 'open', mock_open(read_data=data)):
             if PYPY:
                 # Don't try to get the pypy error messages right. They're
                 # different under different pypy versions and on my local
                 # machine.
                 self.assertRaises(ValueError, SlurmPipelineBase, 'file')
             elif PY3:
-                error = ('^Expecting property name enclosed in double '
-                         'quotes: line 1 column 2 \(char 1\)$')
+                error = (r'^Expecting property name enclosed in double '
+                         r'quotes: line 1 column 2 \(char 1\)$')
                 assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
                                   'file')
             else:
-                error = '^Expecting object: line 1 column 1 \(char 0\)$'
+                error = r'^Expecting object: line 1 column 1 \(char 0\)$'
                 assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
                                   'file')
 
@@ -72,10 +65,9 @@ class TestSlurmPipelineBase(TestCase):
         of a JSON object, a SpecificationError must be raised.
         """
         data = '[]'
-        mockOpener = mockOpen(read_data=data)
-        with patch.object(builtins, 'open', mockOpener):
-            error = ('^The specification must be a dict \(i\.e\., a JSON '
-                     'object when loaded from a file\)$')
+        with patch.object(builtins, 'open', mock_open(read_data=data)):
+            error = (r'^The specification must be a dict \(i\.e\., a JSON '
+                     r'object when loaded from a file\)$')
             assertRaisesRegex(self, SpecificationError, error,
                               SlurmPipelineBase, 'file')
 
@@ -84,8 +76,8 @@ class TestSlurmPipelineBase(TestCase):
         If the specification is passed a list directly instead of a dict, a
         SpecificationError must be raised.
         """
-        error = ('^The specification must be a dict \(i\.e\., a JSON '
-                 'object when loaded from a file\)$')
+        error = (r'^The specification must be a dict \(i\.e\., a JSON '
+                 r'object when loaded from a file\)$')
         assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
                           [])
 
@@ -125,7 +117,7 @@ class TestSlurmPipelineBase(TestCase):
         If the specification steps contains a step that does not have a
         'script' key, a SpecificationError must be raised.
         """
-        error = "^Step 2 \('name2'\) does not have a 'script' key$"
+        error = r"^Step 2 \('name2'\) does not have a 'script' key$"
         assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
                           {
                               'steps': [
@@ -178,7 +170,7 @@ class TestSlurmPipelineBase(TestCase):
         If a step has a 'script' key that is not a string, a SpecificationError
         must be raised.
         """
-        error = "^The 'script' key in step 1 \('name'\) is not a string$"
+        error = r"^The 'script' key in step 1 \('name'\) is not a string$"
         assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
                           {
                               'steps': [
@@ -246,7 +238,7 @@ class TestSlurmPipelineBase(TestCase):
         If a step has a 'dependencies' key that is not a list, a
         SpecificationError must be raised.
         """
-        error = "^Step 1 \('name'\) has a non-list 'dependencies' key$"
+        error = r"^Step 1 \('name'\) has a non-list 'dependencies' key$"
         assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
                           {
                               'steps': [
@@ -263,8 +255,8 @@ class TestSlurmPipelineBase(TestCase):
         If a step has a 'dependencies' key that mentions an unknown step,
         a SpecificationError must be raised.
         """
-        error = ("^Step 2 \('name2'\) depends on a non-existent \(or "
-                 "not-yet-defined\) step: 'unknown'$")
+        error = (r"^Step 2 \('name2'\) depends on a non-existent \(or "
+                 r"not-yet-defined\) step: 'unknown'$")
         assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
                           {
                               'steps': [
@@ -285,7 +277,7 @@ class TestSlurmPipelineBase(TestCase):
         If a step has a 'dependencies' key that mentions that same step,
         a SpecificationError must be raised.
         """
-        error = ("^Step 1 \('name'\) depends itself$")
+        error = r"^Step 1 \('name'\) depends itself$"
         assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
                           {
                               'steps': [
@@ -303,8 +295,8 @@ class TestSlurmPipelineBase(TestCase):
         but that has not yet been defined in the specification steps, a
         SpecificationError must be raised.
         """
-        error = ("^Step 1 \('name1'\) depends on a non-existent \(or "
-                 "not-yet-defined\) step: 'name2'$")
+        error = (r"^Step 1 \('name1'\) depends on a non-existent \(or "
+                 r"not-yet-defined\) step: 'name2'$")
         assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
                           {
                               'steps': [
@@ -338,8 +330,7 @@ class TestSlurmPipelineBase(TestCase):
             ],
         }
         data = dumps(specification)
-        mockOpener = mockOpen(read_data=data)
-        with patch.object(builtins, 'open', mockOpener):
+        with patch.object(builtins, 'open', mock_open(read_data=data)):
             spb = SlurmPipelineBase('file')
             expected = {
                 'steps': {

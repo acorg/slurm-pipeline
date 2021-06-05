@@ -1,3 +1,14 @@
+# Version 3.2.0 - June 5, 2021
+
+The distinction between simulated and skipped steps has been removed as it
+was too subtle and complicated. Only step skipping remains now, and step
+scripts need to decide what to do based on the value of `SP_SKIP`. For
+backwards compatibility, the `SP_SIMULATE` variable is still set in the
+environment, but its value is always identical to `SP_SKIP`.
+
+Removed use of now-outdated ugly mocking code for `open`. This might break
+Python 2 compatibility, but at this point I don't care.
+
 # Version 3.1.1 - August 29, 2019
 
 The `--nice` argument put into the `SP_NICE_ARG` environment variable

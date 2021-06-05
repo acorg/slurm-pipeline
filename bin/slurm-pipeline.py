@@ -78,8 +78,8 @@ parser.add_argument(
 
 parser.add_argument(
     '--scriptArgs', nargs='+', action='append',
-    help=('Specify arguments to be passed to the scripts for initial '
-          'pipeline steps. Initial steps are those that have no dependencies '
+    help=('Specify arguments to be passed to the initial pipeline step '
+          'scripts. Initial steps are those that have no dependencies '
           'in the JSON specification.'))
 
 args = parser.parse_args()
@@ -120,5 +120,4 @@ if os.isatty(1) and args.output is sys.stdout:
     print('WARNING: You did not save stdout to a file, so I have '
           'saved the specification status to %r for you.' % filename,
           file=sys.stderr)
-    os.write(fd, statusAsJSON)
-    os.write(fd, '\n')
+    os.write(fd, statusAsJSON.encode('utf-8') + b'\n')

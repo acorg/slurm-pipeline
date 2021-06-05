@@ -30,8 +30,8 @@ class TestSlurmPipeline(TestCase):
         SpecificationError must be raised.
         """
         isdirMock.return_value = False
-        error = ("^Specification step 1 specifies a working directory "
-                 "\('dir'\) that does not exist")
+        error = (r"^Specification step 1 specifies a working directory "
+                 r"\('dir'\) that does not exist")
         assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
                           {
                               'steps': [
@@ -159,8 +159,8 @@ class TestSlurmPipeline(TestCase):
         If a specification has a 'collect' step with no dependencies,
         a SpecificationError must be raised.
         """
-        error = ("^Step 2 \('name2'\) is a 'collect' step but does not have "
-                 "any dependencies$")
+        error = (r"^Step 2 \('name2'\) is a 'collect' step but does not have "
+                 r"any dependencies$")
         assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
                           {
                               'steps': [
@@ -183,8 +183,8 @@ class TestSlurmPipeline(TestCase):
         If a specification has a 'collect' step with a 'dependencies' key
         whose value is the empty list, a SpecificationError must be raised.
         """
-        error = ("^Step 2 \('name2'\) is a 'collect' step but does not have "
-                 "any dependencies$")
+        error = (r"^Step 2 \('name2'\) is a 'collect' step but does not have "
+                 r"any dependencies$")
         assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
                           {
                               'steps': [
@@ -261,8 +261,8 @@ class TestSlurmPipeline(TestCase):
                     },
                 ]
             })
-        error = ("^Last step \('name1'\) occurs before first step \('name2'\) "
-                 "in the specification$")
+        error = (r"^Last step \('name1'\) occurs before first step "
+                 r"\('name2'\) in the specification$")
         assertRaisesRegex(self, SchedulingError, error, sp.schedule,
                           firstStep='name2', lastStep='name1')
 
@@ -399,9 +399,9 @@ class TestSlurmPipeline(TestCase):
                     },
                 ],
             })
-        error = ("^Task name 'xxx' was output with a duplicate in "
-                 "its job ids \[123, 123\] by 'script1' script in "
-                 "step named 'name1'$")
+        error = (r"^Task name 'xxx' was output with a duplicate in "
+                 r"its job ids \[123, 123\] by 'script1' script in "
+                 r"step named 'name1'$")
         assertRaisesRegex(self, SchedulingError, error, sp.schedule)
 
     @patch('subprocess.check_output')
@@ -514,13 +514,11 @@ class TestSlurmPipeline(TestCase):
                         'SP_FORCE': '0',
                         'SP_NICE_ARG': '--nice',
                         'SP_ORIGINAL_ARGS': '',
-                        'SP_SIMULATE': '0',
                         'SP_SKIP': '0',
                     },
                     'name': 'name1',
                     'script': 'script1',
                     'scheduledAt': 10.0,
-                    'simulate': False,
                     'skip': False,
                     'stdout': 'output',
                     'taskDependencies': {},
@@ -531,13 +529,11 @@ class TestSlurmPipeline(TestCase):
                         'SP_FORCE': '0',
                         'SP_NICE_ARG': '--nice',
                         'SP_ORIGINAL_ARGS': '',
-                        'SP_SIMULATE': '0',
                         'SP_SKIP': '0',
                     },
                     'name': 'name2',
                     'scheduledAt': 10.0,
                     'script': 'script2',
-                    'simulate': False,
                     'skip': False,
                     'stdout': 'output',
                     'taskDependencies': {},
@@ -1017,8 +1013,8 @@ class TestSlurmPipeline(TestCase):
                     },
                 ]
             })
-        error = ("^Script argument \"don't ask me\" contains a single "
-                 "quote, which is currently not supported\.$")
+        error = (r"^Script argument \"don't ask me\" contains a single "
+                 r"quote, which is currently not supported\.$")
         assertRaisesRegex(self, SchedulingError, error, sp.schedule,
                           scriptArgs=["don't ask me", 3])
 
@@ -1185,7 +1181,7 @@ class TestSlurmPipeline(TestCase):
         ])
 
         env = subprocessMock.mock_calls[0][2]['env']
-        self.assertEqual('--nice 40', env['SP_NICE_ARG'])
+        self.assertEqual('--nice=40', env['SP_NICE_ARG'])
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1193,7 +1189,7 @@ class TestSlurmPipeline(TestCase):
     def testFirstStepOnly(self, existsMock, accessMock, subprocessMock):
         """
         If firstStep (bot not lastStep) is specified for a SlurmPipeline the
-        correct SP_SIMULATE value must be set in the environment.
+        correct SP_SKIP value must be set in the environment.
         """
         subprocessMock.return_value = ''
         sp = SlurmPipeline(
@@ -1218,13 +1214,12 @@ class TestSlurmPipeline(TestCase):
                  env=ANY),
         ])
 
-        # Check that the SP_SIMULATE environment variable is correct in
-        # all calls.
+        # Check that the SP_SKIP environment variable is correct in all calls.
         env1 = subprocessMock.mock_calls[0][2]['env']
-        self.assertEqual('1', env1['SP_SIMULATE'])
+        self.assertEqual('1', env1['SP_SKIP'])
 
         env2 = subprocessMock.mock_calls[1][2]['env']
-        self.assertEqual('0', env2['SP_SIMULATE'])
+        self.assertEqual('0', env2['SP_SKIP'])
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1232,7 +1227,7 @@ class TestSlurmPipeline(TestCase):
     def testLastStepOnly(self, existsMock, accessMock, subprocessMock):
         """
         If lastStep (but not firstStep) is specified for a SlurmPipeline the
-        correct SP_SIMULATE value must be set in the environment.
+        correct SP_SKIP value must be set in the environment.
         """
         subprocessMock.return_value = ''
         sp = SlurmPipeline(
@@ -1263,16 +1258,15 @@ class TestSlurmPipeline(TestCase):
                  env=ANY),
         ])
 
-        # Check that the SP_SIMULATE environment variable is correct in all
-        # calls.
+        # Check that the SP_SKIP environment variable is correct in all calls.
         env1 = subprocessMock.mock_calls[0][2]['env']
-        self.assertEqual('0', env1['SP_SIMULATE'])
+        self.assertEqual('0', env1['SP_SKIP'])
 
         env2 = subprocessMock.mock_calls[1][2]['env']
-        self.assertEqual('0', env2['SP_SIMULATE'])
+        self.assertEqual('0', env2['SP_SKIP'])
 
         env2 = subprocessMock.mock_calls[2][2]['env']
-        self.assertEqual('1', env2['SP_SIMULATE'])
+        self.assertEqual('1', env2['SP_SKIP'])
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1281,7 +1275,7 @@ class TestSlurmPipeline(TestCase):
                                           subprocessMock):
         """
         If firstStep and lastStep are specified for a SlurmPipeline and the
-        steps are not the same, the correct SP_SIMULATE value must be set
+        steps are not the same, the correct SP_SKIP value must be set
         correctly in the environment.
         """
         subprocessMock.return_value = ''
@@ -1319,19 +1313,18 @@ class TestSlurmPipeline(TestCase):
                  env=ANY),
         ])
 
-        # Check that the SP_SIMULATE environment variable is correct in
-        # all calls.
+        # Check that the SP_SKIP environment variable is correct in all calls.
         env1 = subprocessMock.mock_calls[0][2]['env']
-        self.assertEqual('1', env1['SP_SIMULATE'])
+        self.assertEqual('1', env1['SP_SKIP'])
 
         env2 = subprocessMock.mock_calls[1][2]['env']
-        self.assertEqual('0', env2['SP_SIMULATE'])
+        self.assertEqual('0', env2['SP_SKIP'])
 
         env3 = subprocessMock.mock_calls[2][2]['env']
-        self.assertEqual('0', env3['SP_SIMULATE'])
+        self.assertEqual('0', env3['SP_SKIP'])
 
         env4 = subprocessMock.mock_calls[3][2]['env']
-        self.assertEqual('1', env4['SP_SIMULATE'])
+        self.assertEqual('1', env4['SP_SKIP'])
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1340,7 +1333,7 @@ class TestSlurmPipeline(TestCase):
                                      subprocessMock):
         """
         If firstStep and lastStep are specified for a SlurmPipeline and the
-        steps are the same, the correct SP_SIMULATE value must be set
+        steps are the same, the correct SP_SKIP value must be set
         correctly in the environment.
         """
         subprocessMock.return_value = ''
@@ -1372,16 +1365,15 @@ class TestSlurmPipeline(TestCase):
                  env=ANY),
         ])
 
-        # Check that the SP_SIMULATE environment variable is correct in
-        # all calls.
+        # Check that the SP_SKIP environment variable is correct in all calls.
         env1 = subprocessMock.mock_calls[0][2]['env']
-        self.assertEqual('1', env1['SP_SIMULATE'])
+        self.assertEqual('1', env1['SP_SKIP'])
 
         env2 = subprocessMock.mock_calls[1][2]['env']
-        self.assertEqual('0', env2['SP_SIMULATE'])
+        self.assertEqual('0', env2['SP_SKIP'])
 
         env3 = subprocessMock.mock_calls[2][2]['env']
-        self.assertEqual('1', env3['SP_SIMULATE'])
+        self.assertEqual('1', env3['SP_SKIP'])
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1389,7 +1381,7 @@ class TestSlurmPipeline(TestCase):
     def testFirstStepAndNoLastStep(self, existsMock, accessMock,
                                    subprocessMock):
         """
-        If firstStep is specified and lastStep is not, the correct SP_SIMULATE
+        If firstStep is specified and lastStep is not, the correct SP_SKIP
         value must be set correctly in the environment.
         """
         subprocessMock.return_value = ''
@@ -1421,16 +1413,15 @@ class TestSlurmPipeline(TestCase):
                  env=ANY),
         ])
 
-        # Check that the SP_SIMULATE environment variable is correct in
-        # all calls.
+        # Check that the SP_SKIP environment variable is correct in all calls.
         env1 = subprocessMock.mock_calls[0][2]['env']
-        self.assertEqual('1', env1['SP_SIMULATE'])
+        self.assertEqual('1', env1['SP_SKIP'])
 
         env2 = subprocessMock.mock_calls[1][2]['env']
-        self.assertEqual('0', env2['SP_SIMULATE'])
+        self.assertEqual('0', env2['SP_SKIP'])
 
         env3 = subprocessMock.mock_calls[2][2]['env']
-        self.assertEqual('0', env3['SP_SIMULATE'])
+        self.assertEqual('0', env3['SP_SKIP'])
 
     @patch('subprocess.check_output')
     @patch('time.sleep')
@@ -1535,7 +1526,7 @@ class TestSlurmPipeline(TestCase):
         If the passed skip argument contains a non-existent step name, a
         SchedulingError must be raised.
         """
-        error = '^Unknown skip step \(xxx\) passed to schedule$'
+        error = r'^Unknown skip step \(xxx\) passed to schedule$'
         sp = SlurmPipeline(
             {
                 'steps': [
@@ -1556,7 +1547,7 @@ class TestSlurmPipeline(TestCase):
         If the passed skip argument contains two non-existent step names, a
         SchedulingError must be raised.
         """
-        error = '^Unknown skip steps \(xxx, yyy\) passed to schedule$'
+        error = r'^Unknown skip steps \(xxx, yyy\) passed to schedule$'
         sp = SlurmPipeline(
             {
                 'steps': [
@@ -1707,14 +1698,12 @@ class TestSlurmPipeline(TestCase):
                             'SP_FORCE': '1',
                             'SP_NICE_ARG': '--nice',
                             'SP_ORIGINAL_ARGS': '',
-                            'SP_SIMULATE': '1',
-                            'SP_SKIP': '0',
+                            'SP_SKIP': '1',
                         },
                         'name': 'name1',
                         'scheduledAt': 10.0,
                         'script': 'script1',
-                        'simulate': True,
-                        'skip': False,
+                        'skip': True,
                         'stdout': 'TASK: xxx 123\n',
                         'taskDependencies': {},
                         "tasks": {
@@ -1729,14 +1718,12 @@ class TestSlurmPipeline(TestCase):
                             'SP_FORCE': '1',
                             'SP_NICE_ARG': '--nice',
                             'SP_ORIGINAL_ARGS': '',
-                            'SP_SIMULATE': '0',
                             'SP_SKIP': '0',
                         },
                         'dependencies': ['name1'],
                         'name': 'name2',
                         'scheduledAt': 10.0,
                         'script': 'script2',
-                        'simulate': False,
                         'skip': False,
                         'stdout': 'TASK: xxx 123\n',
                         "taskDependencies": {
@@ -1826,7 +1813,7 @@ class TestSlurmPipeline(TestCase):
                     },
                 ],
             })
-        error = "^Nice \(priority\) value 'x' is not numeric$"
+        error = r"^Nice \(priority\) value 'x' is not numeric$"
         assertRaisesRegex(self, SchedulingError, error, sp.schedule, nice='x')
 
     @patch('subprocess.check_output')
@@ -1847,8 +1834,8 @@ class TestSlurmPipeline(TestCase):
                     },
                 ],
             })
-        error = ("^Nice \(priority\) value 10001 is outside the allowed "
-                 "\[-10000, 10000\] range$")
+        error = (r"^Nice \(priority\) value 10001 is outside the allowed "
+                 r"\[-10000, 10000\] range$")
         assertRaisesRegex(self, SchedulingError, error, sp.schedule,
                           nice=10001)
 
@@ -1870,8 +1857,8 @@ class TestSlurmPipeline(TestCase):
                     },
                 ],
             })
-        error = ("^Nice \(priority\) value -10001 is outside the allowed "
-                 "\[-10000, 10000\] range$")
+        error = (r"^Nice \(priority\) value -10001 is outside the allowed "
+                 r"\[-10000, 10000\] range$")
         assertRaisesRegex(self, SchedulingError, error, sp.schedule,
                           nice=-10001)
 
@@ -1900,16 +1887,16 @@ class TestSlurmPipeline(TestCase):
             subprocessMock.side_effect = CalledProcessError(
                 3, 'command.sh', output='the stdout', stderr='the stderr')
 
-            error = ("^Could not execute step 'name1' script 'script1' in "
-                     "directory 'dir'\. Attempted command: 'command.sh'\. "
-                     "Exit status: 3\. Standard output: 'the stdout'\. "
-                     "Standard error: 'the stderr'\.$")
+            error = (r"^Could not execute step 'name1' script 'script1' in "
+                     r"directory 'dir'\. Attempted command: 'command.sh'\. "
+                     r"Exit status: 3\. Standard output: 'the stdout'\. "
+                     r"Standard error: 'the stderr'\.$")
         else:
             subprocessMock.side_effect = CalledProcessError(3, 'command.sh')
 
-            error = ("^Could not execute step 'name1' script 'script1' in "
-                     "directory 'dir'\. Attempted command: 'command.sh'\. "
-                     "Exit status: 3\.$")
+            error = (r"^Could not execute step 'name1' script 'script1' in "
+                     r"directory 'dir'\. Attempted command: 'command.sh'\. "
+                     r"Exit status: 3\.$")
 
         assertRaisesRegex(self, SchedulingError, error, sp.schedule)
 
@@ -1934,10 +1921,12 @@ class TestSlurmPipeline(TestCase):
                 ],
             })
 
-        subprocessMock.side_effect = OSError('No such file or directory: script1')
+        subprocessMock.side_effect = OSError(
+            'No such file or directory: script1')
 
-        error = ("^Could not execute step 'name1' script 'script1' in directory "
-                 "'dir'\. Attempted command: 'script1'\. Error: No such file or "
-                 "directory: script1$")
+        error = (
+            r"^Could not execute step 'name1' script 'script1' in directory "
+            r"'dir'\. Attempted command: 'script1'\. Error: No such file or "
+            r"directory: script1$")
 
         assertRaisesRegex(self, SchedulingError, error, sp.schedule)

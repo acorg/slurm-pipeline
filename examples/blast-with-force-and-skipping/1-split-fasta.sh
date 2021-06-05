@@ -3,14 +3,14 @@
 echo >> pipeline.log
 echo "In $(basename $0)" >> pipeline.log
 echo "SP_FORCE is $SP_FORCE" >> pipeline.log
-echo "SP_SIMULATE is $SP_SIMULATE" >> pipeline.log
+echo "SP_SKIP is $SP_SKIP" >> pipeline.log
 
 prexistingCount=$(ls x?? 2>/dev/null | wc -l | awk '{print $1}')
 echo "There are $prexistingCount pre-existing split files." >> pipeline.log
 
-if [ $SP_SIMULATE = "0" ]
+if [ $SP_SKIP = "0" ]
 then
-    echo "This is not a simulation." >> pipeline.log
+    echo "This step is not skipped." >> pipeline.log
     if [ $prexistingCount -ne 0 ]
     then
         if [ $SP_FORCE = "1" ]
@@ -26,7 +26,7 @@ then
         split -l 2 $1
     fi
 else
-    echo "This is a simulation. Will re-emit task names (the already existing split file names)." >> pipeline.log
+    echo "Skipping. Will re-emit task names (the already existing split file names)." >> pipeline.log
 fi
 
 for task in x??
