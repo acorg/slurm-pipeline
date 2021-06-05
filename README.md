@@ -4,15 +4,14 @@ A [Python](https://www.python.org) class for scheduling and examining
 [SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
-Runs under Python 2.7, 3.5, 3.6, 3.7-dev, and [pypy](http://pypy.org/)
+Runs under Python 2.7, 3.5-3.9, and [pypy](http://pypy.org/)
 [Change log](CHANGELOG.md).
 [![Build Status](https://travis-ci.org/acorg/slurm-pipeline.svg?branch=master)](https://travis-ci.org/acorg/slurm-pipeline)
 
 Funding for the development of this package comes from:
 
 * the European Union Horizon 2020 research and innovation programme,
-  [COMPARE](http://www.compare-europe.eu/) grant (agreement No. 643476),
-  and
+  [COMPARE](http://www.compare-europe.eu/) grant (agreement No. 643476), and
 * U.S. Federal funds from the Department of Health and Human Services;
   Office of the Assistant Secretary for Preparedness and Response;
   Biomedical Advanced Research and Development Authority, under Contract
@@ -200,41 +199,41 @@ the `word-count` example below for sample output.
   this and act accordingly. If `--force` is not used, `SP_FORCE` will be
   set to `0`.
 * `--firstStep step-name`: Step scripts are always run with an environment
-  variable called `SP_SIMULATE`. Normally this will be set to `0` for all
+  variable called `SP_SKIP`. Normally this is set to `0` for all
   steps. Sometimes though, you may want to start a pipeline from one of its
-  intermediate steps and not re-do the work of earlier steps. If you specify
-  `--firstStep step-name`, the steps before `step-name` will be invoked with
-  `SP_SIMULATE=1` in their environment. It is up to the scripts to decide how
-  to act when `SP_SIMULATE=1`.
-* `--lastStep step-name`: Corresponds to `--firstStep`, except it turns
-  simulation back on (i.e., sets `SP_SIMULATE=1`) for steps after the named
-  step. Note that `--firstStep` and `--lastStep` may specify the same step
-  (to just run that step) and that `--firstStep` may be given without also
-  giving `--lastStep`.
+  intermediate steps and not re-do the work of earlier steps. If you
+  specify `--firstStep step-name`, the steps before `step-name` will be
+  invoked with `SP_SKIP=1` in their environment. It is up to the scripts to
+  decide how to act when `SP_SKIP=1`.
+* `--lastStep step-name`: Corresponds to `--firstStep`, except it indicates
+  that step execution should be skipped (i.e., it sets `SP_SKIP=1`) for
+  steps after the named step. Note that `--firstStep` and `--lastStep` may
+  specify an identical step, to just run one step.
 * `--skip`: Used to tell `slurm-pipeline.py` to tell a step script that it
-  should be skipped. In this case the script should act as though it is not
-  even in the pipeline. Commonly this will mean just taking its expected
-  input file and copying it unchanged to the place where it normally puts
-  its output. This allows the next script in the pipeline to run without
-  error. This argument may be repeated to skip multiple steps. See also the
-  `skip` directive that can be used in a specification file for more
-  permanent disabling of a script step.
+  should be skipped. When skipped, a script should make sure that
+  subsequent steps in the pipeline can still proceed. Commonly this will
+  mean just taking its expected input file and copying it unchanged to the
+  place where it normally puts its output, or if the output is already
+  present due to a prior run, just doing nothing. This argument may be
+  repeated to skip multiple steps. See also the `skip` directive that can
+  be used in a specification file for more permanent disabling of a script
+  step.
 * `--startAfter`: Specify one or more SLURM job ids that must be allowed to
   complete (in any state - successful or in error) before the initial steps
   of the current specification are allowed to run. If you have saved the
   output of a previous `slurm-pipeline.py` run, you can use
-  `slurm-pipeline-status.py` to output the final job ids of that previous
-  run and give those job ids to a subsequent invocation of
+  `slurm-pipeline-status.py --printFinal` to output the final job ids of
+  that previous run and give those job ids to a subsequent invocation of
   `slurm-pipeline.py` (see `slurm-pipeline-status.py` below for an
   example).
 * `--scriptArgs`: Specify arguments that should appear on the command line
   when initial step scripts are run. The initial steps are those that do
   not have any dependencies.
 
-Note that all script steps are *always* executed, including when
-`--firstStep` or `--skip` are used. See below for the reasoning behind
-this.  It is up to the scripts to decide what to do (based on the `SP_*`
-environment variables) in those cases.
+It is important to understand that all script steps are *always* invoked,
+including when `--firstStep` or `--skip` are used. See below for the
+reasoning behind this.  It is up to the scripts to decide what to do (based
+on the `SP_*` environment variables).
 
 `slurm-pipeline.py` prints an updated specification to `stdout` or to the
 file specified with `--output`. You will probably always want to save this
@@ -251,41 +250,15 @@ help by writing the status specification to a temporary file (as well as
 
 All scripts are always executed because `slurm-pipeline.py` cannot know
 what arguments to pass to intermediate step scripts to run them in
-isolaion. In a normal run with no simulated or skipped steps, steps emit
-task names that are passed through the pipeline to subsequent steps. If the
-earlier steps are not run, `slurm-pipeline.py` cannot know what task
-arguments to pass to the scripts for those later steps.
+isolaion. In a normal run with no skipped steps, steps emit task names that
+are passed through the pipeline to subsequent steps. If the earlier steps
+are not run, `slurm-pipeline.py` cannot know what task arguments to pass to
+the scripts for those later steps.
 
 It is also conceptually easier to know that `slurm-pipeline.py` always runs
-all pipeline step scripts, whether or not they are simulating or being
-skipped (see <a href="#separation">Separation of concerns</a> below).
-Simulated steps may want to log the fact that they were run in simulated
-mode, etc.
-
-### Simulating versus skipping
-
-Scripts that are simulating will normally want to emit task names, as
-usual, but without doing any work *because the work has already been done
-in a previous run*. In that case they can emit the task name with no job
-id, so the later steps in the pipeline will not need to wait.  In
-simulation (as opposed to skipping), the script has already done its work
-(its output file(s) are already in place) and simply does nothing.
-
-Skipping refers to when a step is really no longer in the pipeline. A step
-that skips will normally just want to pass along its input to its output
-unchanged. I.e., the step must act as though it were not in the pipeline.
-The step still needs to be run so that it can make sure that subsequent
-steps do not fail. It can be more convenient to add `"skip": true` to a
-specification file to completely get rid of a step rather than changing the
-subsequent step to take its input from the location the stepped script
-would use. Using `--skip step-name` on the command line also provides an
-easy way to skip a step.
-
-In summary, a simulated step doesn't do anything because its work was
-already done on a previous run, but a skipped step pretends it's not in the
-pipeline at all (typically by just copying or moving its input to its
-output unchanged). The skipped step *never* does any real work, whereas the
-simulated step has *already* done its work.
+all pipeline step scripts, whether or not they are being skipped (see <a
+href="#separation">Separation of concerns</a> below).  Skipped steps may
+also want to log the fact that the pipeline ran and they were skipped, etc.
 
 <a id="directives"></a>
 ## Specification file directives
@@ -318,8 +291,8 @@ the full list:
 
 ## Step script environment variables
 
-The following environment variables are set when a step's script is
-executed:
+Step scripts inherit environment variables that are set when
+`slurm-pipeline.py` is run. The following additional variables are set:
 
 * `SP_ORIGINAL_ARGS` will contain the (space-separated) list of arguments
   originally passed to `slurm-pipeline.py` using the `--scriptArgs`
@@ -337,16 +310,15 @@ executed:
   `slurm-pipeline.py` command line. This can be used to inform step scripts
   that they may overwrite pre-existing result files if they wish. If
   `--force` is not specified, `SP_FORCE` will be set to `0`.
-* `SP_SIMULATE` will be set to `1` if the step should be simulated, and `0`
-  if not. See the description of `--firstStep` and `--lastStep` above for
-  how to turn simulation on and off. In simulating a step, a script should
-  just emit its task name(s) as usual, but without job ids. The presumption
-  is that a pipeline is being re-run and that the work that would normally
-  be done by a step that is now being simulated has already been done. A
-  script that is called with `SP_SIMULATE=1` might want to check that its
-  regular output does in fact already exist, but there's no need to exit if
-  not. The entire pipeline might be simulated, in which case there is no
-  issue if intermediate results are never computed.
+* `SP_SKIP` will be set to `1` if the step should be skipped, and `0` if
+  not. See the description of `--firstStep` and `--lastStep` above for how
+  to turn step skipping on and off. When a step is skipped, its script
+  should just emit its task name(s) as usual, but without SLURM job
+  ids. The presumption is that a pipeline is being re-run and that the work
+  that would normally be done by a step that is now being skipped has
+  already been done. A script that is called with `SP_SKIP=1` might
+  want to check that its regular output does in fact already exist, but
+  there's no need to exit if not.
 * `SP_DEPENDENCY_ARG` contains a string that must be used when the script
   invokes `sbatch` to guarantee that the execution of the script does not
   begin until after the tasks from all dependent steps have finished
@@ -484,13 +456,11 @@ Step 1: sleep
   Working directory: 01-sleep
   Scheduled at: 2018-04-15 21:20:23
   Script: submit.sh
-  Simulate: False
   Skip: False
   Slurm pipeline environment variables:
     SP_FORCE: 0
     SP_NICE_ARG: --nice
     SP_ORIGINAL_ARGS:
-    SP_SIMULATE: 0
     SP_SKIP: 0
 Step 2: multisleep
   1 step dependency: sleep
@@ -512,14 +482,12 @@ Step 2: multisleep
   Working directory: 02-multisleep
   Scheduled at: 2018-04-15 21:20:23
   Script: submit.sh
-  Simulate: False
   Skip: False
   Slurm pipeline environment variables:
     SP_DEPENDENCY_ARG: --dependency=afterok:1349824
     SP_FORCE: 0
     SP_NICE_ARG: --nice
     SP_ORIGINAL_ARGS:
-    SP_SIMULATE: 0
     SP_SKIP: 0
 Step 3: error
   1 step dependency: multisleep
@@ -541,14 +509,12 @@ Step 3: error
   Working directory: 03-error
   Scheduled at: 2018-04-15 21:20:23
   Script: submit.sh
-  Simulate: False
   Skip: False
   Slurm pipeline environment variables:
     SP_DEPENDENCY_ARG: --dependency=afternotok:1349825?afternotok:1349826?afternotok:1349827
     SP_FORCE: 0
     SP_NICE_ARG: --nice
     SP_ORIGINAL_ARGS:
-    SP_SIMULATE: 0
     SP_SKIP: 0
 ```
 
@@ -623,7 +589,6 @@ status:
       "name": "one-per-line",
       "scheduledAt": 1482709202.65294,
       "script": "scripts/one-word-per-line.sh",
-      "simulate": false,
       "skip": false,
       "stdout": "TASK: 1-karamazov 22480\nTASK: 2-trial 26912\nTASK: 3-ulysses 25487\n",
       "taskDependencies": {},
@@ -646,7 +611,6 @@ status:
       "name": "long-words",
       "scheduledAt": 1482709202.68266,
       "script": "scripts/long-words-only.sh",
-      "simulate": false,
       "skip": false,
       "stdout": "TASK: 3-ulysses 1524\n",
       "taskDependencies": {
@@ -680,7 +644,6 @@ status:
       "name": "summarize",
       "scheduledAt": 1482709202.7016,
       "script": "scripts/summarize.sh",
-      "simulate": false,
       "skip": false,
       "stdout": "",
       "taskDependencies": {
@@ -749,24 +712,24 @@ files).
 
 ### Simulated BLAST with --force and --firstStep
 
-`examples/blast-with-force-and-simulate` simulates the running of
+`examples/blast-with-force-and-skipping` simulates the running of
 [BLAST](https://blast.ncbi.nlm.nih.gov/Blast.cgi) on a FASTA file, as
 above.
 
 In this case the step scripts take the values of `SP_FORCE` and
-`SP_SIMULATE` into account.
+`SP_SKIP` into account.
 
 As in the `examples/blast` example, all the action takes place in the same
 directory, but intermediate files are not removed along the way. This
-allows the step scripts to avoid doing work when `SP_SIMULATE=1` and to
+allows the step scripts to avoid doing work when `SP_SKIP=1` and to
 detect whether their output already exists, etc. A detailed log of the
 actions taken is written to `pipeline.log`.
 
 The `Makefile` has some convenient targets: `run`, `rerun`, and `force`.
 You can (and should) of course run `slurm-pipeline.py` from the command
 line yourself, with and without `--force` and using `--firstStep` and
-`--lastStep` to control which steps are simulated (i.e., receive
-`SP_SIMULATE=1` in their environment) and which are not.
+`--lastStep` to control which steps are skipped (i.e., receive `SP_SKIP=1`
+in their environment) and which are not.
 
  Use `make clean` to get rid of the intermediate files.
 
@@ -827,7 +790,7 @@ and the scripts. The scripts use `sbatch` to submit SLURM jobs, unlike
 those (described above) in the `examples` directory. Note the treatment of
 the various `SP_*` variables in the `sbatch.sh` scripts and also the
 conditional setting of `--exclusive` depending on whether steps are being
-simulated or not.
+skipped or not.
 
 ## Limitations
 

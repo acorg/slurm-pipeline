@@ -20,6 +20,9 @@ pycodestyle:
 pyflakes:
 	find .  -path './.tox' -prune -path './build' -prune -o -path './dist' -prune -o -name '*.py' -print0 | xargs -0 pyflakes
 
+flake8:
+	find .  -path './.tox' -prune -path './build' -prune -o -path './dist' -prune -o -name '*.py' -print0 | xargs -0 flake8
+
 lint: pycodestyle pyflakes
 
 wc:

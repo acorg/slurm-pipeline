@@ -736,7 +736,6 @@ class TestSlurmPipelineStatus(TestCase):
                     'name': 'start',
                     'scheduledAt': 1481379659.1530972,
                     'script': '00-start/start.sh',
-                    'simulate': True,
                     'skip': False,
                     'stdout': '',
                     'taskDependencies': {},
@@ -754,7 +753,6 @@ class TestSlurmPipelineStatus(TestCase):
                     'name': 'split',
                     'scheduledAt': 1481379664.184737,
                     'script': '01-split/sbatch.sh',
-                    'simulate': True,
                     'skip': False,
                     'stdout': '',
                     'taskDependencies': {},
@@ -776,7 +774,6 @@ class TestSlurmPipelineStatus(TestCase):
                     'name': 'blastn',
                     'scheduledAt': 1481379722.3996398,
                     'script': '02-blastn/sbatch.sh',
-                    'simulate': True,
                     'skip': False,
                     'stdout': '',
                     'taskDependencies': {
@@ -809,7 +806,6 @@ class TestSlurmPipelineStatus(TestCase):
                     'name': 'panel',
                     'scheduledAt': 1481379722.5036008,
                     'script': '03-panel/sbatch.sh',
-                    'simulate': False,
                     'skip': False,
                     'stdout': 'TASK: panel 4417615\n',
                     'taskDependencies': {
@@ -841,7 +837,6 @@ class TestSlurmPipelineStatus(TestCase):
                     'name': 'stop',
                     'scheduledAt': 1481379722.5428307,
                     'script': '04-stop/sbatch.sh',
-                    'simulate': False,
                     'skip': False,
                     'stdout': 'TASK: stop 4417616\n',
                     'taskDependencies': {
@@ -898,7 +893,6 @@ Step 1: start
   Working directory: 00-start
   Scheduled at: 2016-12-10 14:20:59
   Script: 00-start/start.sh
-  Simulate: True
   Skip: False
   Slurm pipeline environment variables:
     SP_FORCE: 1
@@ -917,7 +911,6 @@ Step 2: split
   Working directory: 01-split
   Scheduled at: 2016-12-10 14:21:04
   Script: 01-split/sbatch.sh
-  Simulate: True
   Skip: False
   Slurm pipeline environment variables:
     SP_FORCE: 1
@@ -947,7 +940,6 @@ Nodelist=cpu-7
   Working directory: 02-blastn
   Scheduled at: 2016-12-10 14:22:02
   Script: 02-blastn/sbatch.sh
-  Simulate: True
   Skip: False
   Slurm pipeline environment variables:
     SP_FORCE: 1
@@ -978,7 +970,6 @@ Nodelist=cpu-8
   Working directory: 03-panel
   Scheduled at: 2016-12-10 14:22:02
   Script: 03-panel/sbatch.sh
-  Simulate: False
   Skip: False
   Slurm pipeline environment variables:
     SP_FORCE: 1
@@ -1003,7 +994,6 @@ Nodelist=cpu-3
   Working directory: 04-stop
   Scheduled at: 2016-12-10 14:22:02
   Script: 04-stop/sbatch.sh
-  Simulate: False
   Skip: False
   Slurm pipeline environment variables:
     SP_FORCE: 1
@@ -1037,7 +1027,6 @@ Nodelist=cpu-3
                     'name': 'start-step',
                     'scheduledAt': 1481379659.1530972,
                     'script': '00-start/start.sh',
-                    'simulate': True,
                     'skip': False,
                     'stdout': '',
                     'taskDependencies': {},
@@ -1081,7 +1070,6 @@ Step 1: start-step
   Working directory: 00-start
   Scheduled at: 2016-12-10 14:20:59
   Script: 00-start/start.sh
-  Simulate: True
   Skip: False
   Slurm pipeline environment variables:
     SP_FORCE: 1

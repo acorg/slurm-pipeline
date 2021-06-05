@@ -224,7 +224,6 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             '  Working directory: %s' % step.get('cwd', '.'),
             '  Scheduled at: %s' % secondsToTime(step['scheduledAt']),
             '  Script: %s' % step['script'],
-            '  Simulate: %s' % step['simulate'],
             '  Skip: %s' % step['skip'],
         ])
 

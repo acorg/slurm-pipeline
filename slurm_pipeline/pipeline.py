@@ -33,7 +33,7 @@ class SlurmPipeline(SlurmPipelineBase):
     NICE_LOWEST = 10000
 
     ENV_VARS = ('SP_DEPENDENCY_ARG', 'SP_FORCE', 'SP_FORCE', 'SP_NICE_ARG',
-                'SP_ORIGINAL_ARGS', 'SP_SIMULATE', 'SP_SKIP')
+                'SP_ORIGINAL_ARGS', 'SP_SKIP')
 
     @staticmethod
     def checkSpecification(specification):
@@ -82,7 +82,7 @@ class SlurmPipeline(SlurmPipelineBase):
             slurm-pipeline.py command line.
         @param firstStep: If not C{None}, the name of the first specification
             step to execute. Earlier steps will actually be executed but they
-            will have SP_SIMULATE=1 in their environment, allowing them to not
+            will have SP_SKIPE=1 in their environment, allowing them to not
             do actual work (while still emitting task names without job
             numbers so that later steps receive the correct tasks to operate
             on.
@@ -144,27 +144,28 @@ class SlurmPipeline(SlurmPipelineBase):
                 if firstStepFound:
                     if lastStep is not None:
                         if lastStepFound:
-                            simulate = True
+                            impliedSkip = True
                         else:
                             if stepName == lastStep:
-                                simulate = False
+                                impliedSkip = False
                                 lastStepFound = True
                             else:
-                                simulate = True
+                                impliedSkip = True
                     else:
-                        simulate = False
+                        impliedSkip = False
                 else:
                     if stepName == firstStep:
-                        simulate = False
+                        impliedSkip = False
                         firstStepFound = True
                     else:
-                        simulate = True
+                        impliedSkip = True
             else:
-                simulate = False
+                impliedSkip = False
 
-            self._scheduleStep(stepName, steps, simulate, scriptArgs,
-                               stepName in skip or ('skip' in steps[stepName]),
-                               startAfter)
+            self._scheduleStep(
+                stepName, steps, scriptArgs,
+                impliedSkip or stepName in skip or 'skip' in steps[stepName],
+                startAfter)
 
             # If we're supposed to pause between scheduling steps and this
             # is not the last step, then sleep.
@@ -173,15 +174,11 @@ class SlurmPipeline(SlurmPipelineBase):
 
         return specification
 
-    def _scheduleStep(self, stepName, steps, simulate, scriptArgs, skip,
-                      startAfter):
+    def _scheduleStep(self, stepName, steps, scriptArgs, skip, startAfter):
         """
         Schedule a single execution step.
 
         @param step: A C{dict} with a job specification.
-        @param simulate: If C{True}, this step should be simulated. The step
-            script is still run, but with SP_SIMULATE=1 in its environment.
-            Else, SP_SIMULATE=0 will be in the environment.
         @param scriptArgs: A C{list} of C{str} arguments that should be put on
             the command line of all steps that have no dependencies.
         @param skip: If C{True}, the step should be skipped, which will be
@@ -195,7 +192,6 @@ class SlurmPipeline(SlurmPipelineBase):
         """
         step = steps[stepName]
         step['tasks'] = defaultdict(set)
-        step['simulate'] = simulate
         step['skip'] = skip
         scriptArgsStr = ' '.join(map(str, scriptArgs)) if scriptArgs else ''
         if scriptArgs:
@@ -238,8 +234,7 @@ class SlurmPipeline(SlurmPipelineBase):
                 # depended on.
                 env = environ.copy()
                 env['SP_ORIGINAL_ARGS'] = scriptArgsStr
-                env['SP_SIMULATE'] = str(int(simulate))
-                env['SP_SKIP'] = str(int(skip))
+                env['SP_SKIP'] = env['SP_SIMULATE'] = str(int(skip))
                 dependencies = separator.join(
                     sorted(('%s:%d' % (after, jobId))
                            for jobIds in taskDependencies.values()
@@ -252,8 +247,7 @@ class SlurmPipeline(SlurmPipelineBase):
                 for taskName in sorted(taskDependencies):
                     env = environ.copy()
                     env['SP_ORIGINAL_ARGS'] = scriptArgsStr
-                    env['SP_SIMULATE'] = str(int(simulate))
-                    env['SP_SKIP'] = str(int(skip))
+                    env['SP_SKIP'] = env['SP_SIMULATE'] = str(int(skip))
                     jobIds = steps[stepName]['tasks'][taskName]
                     dependencies = separator.join(
                         sorted(('%s:%d' % (after, jobId))
@@ -288,8 +282,7 @@ class SlurmPipeline(SlurmPipelineBase):
                 args = [] if scriptArgs is None else list(map(str, scriptArgs))
 
             env['SP_ORIGINAL_ARGS'] = scriptArgsStr
-            env['SP_SIMULATE'] = str(int(simulate))
-            env['SP_SKIP'] = str(int(skip))
+            env['SP_SKIP'] = env['SP_SIMULATE'] = str(int(skip))
             self._runStepScript(step, args, env)
 
         step['scheduledAt'] = time.time()
