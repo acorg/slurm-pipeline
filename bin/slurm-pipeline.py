@@ -77,6 +77,10 @@ parser.add_argument(
           'format). Default is standard output.'))
 
 parser.add_argument(
+    '--printOutput', action='store_true',
+    help='Print the output of each pipeline step that is run.')
+
+parser.add_argument(
     '--scriptArgs', nargs='+', action='append',
     help=('Specify arguments to be passed to the initial pipeline step '
           'scripts. Initial steps are those that have no dependencies '
@@ -103,7 +107,7 @@ else:
 status = sp.schedule(
     force=args.force, firstStep=args.firstStep, lastStep=args.lastStep,
     sleep=args.sleep, scriptArgs=scriptArgs, skip=args.skip,
-    startAfter=startAfter, nice=args.nice)
+    startAfter=startAfter, nice=args.nice, printOutput=args.printOutput)
 
 statusAsJSON = sp.specificationToJSON(status)
 

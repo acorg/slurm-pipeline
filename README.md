@@ -229,6 +229,10 @@ the `word-count` example below for sample output.
 * `--scriptArgs`: Specify arguments that should appear on the command line
   when initial step scripts are run. The initial steps are those that do
   not have any dependencies.
+* `--printOutput`: Print the output of running each step to standard
+  output.  Note that the output of each step is also always contained in
+  the JSON status output (which is also printed to standard output unless
+  the `--output` option is used to redirect it).
 
 It is important to understand that all script steps are *always* invoked,
 including when `--firstStep` or `--skip` are used. See below for the

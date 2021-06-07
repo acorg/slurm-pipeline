@@ -32,8 +32,8 @@ class SlurmPipeline(SlurmPipelineBase):
     NICE_HIGHEST = -10000
     NICE_LOWEST = 10000
 
-    ENV_VARS = ('SP_DEPENDENCY_ARG', 'SP_FORCE', 'SP_FORCE', 'SP_NICE_ARG',
-                'SP_ORIGINAL_ARGS', 'SP_SKIP')
+    ENV_VARS = ('SP_DEPENDENCY_ARG', 'SP_FORCE', 'SP_NICE_ARG', 'SP_SKIP',
+                'SP_ORIGINAL_ARGS')
 
     @staticmethod
     def checkSpecification(specification):
@@ -72,7 +72,8 @@ class SlurmPipeline(SlurmPipelineBase):
                     (step['script'], count))
 
     def schedule(self, force=False, firstStep=None, lastStep=None, sleep=0.0,
-                 scriptArgs=None, skip=None, startAfter=None, nice=None):
+                 scriptArgs=None, skip=None, startAfter=None, nice=None,
+                 printOutput=False):
         """
         Schedule the running of our execution specification.
 
@@ -107,6 +108,7 @@ class SlurmPipeline(SlurmPipelineBase):
         @param nice: An C{int} nice (priority) value, in the range
             self.NICE_HIGHEST to self.NICE_LOWEST. Note that only
             privileged users can specify a negative adjustment.
+        @param printOutput: If C{True}, print the output of each step.
         @raise SchedulingError: If there is a problem with the first, last, or
             skipped steps, as determined by self._checkRuntime. ValueError if
             C{nice} is not numeric or is out of its allowed range.
@@ -167,6 +169,11 @@ class SlurmPipeline(SlurmPipelineBase):
                 impliedSkip or stepName in skip or 'skip' in steps[stepName],
                 startAfter)
 
+            if printOutput:
+                step = steps[stepName]
+                if step['stdout']:
+                    print(step['stdout'], end='')
+
             # If we're supposed to pause between scheduling steps and this
             # is not the last step, then sleep.
             if sleep > 0.0 and stepIndex < nSteps - 1:
@@ -178,7 +185,8 @@ class SlurmPipeline(SlurmPipelineBase):
         """
         Schedule a single execution step.
 
-        @param step: A C{dict} with a job specification.
+        @param stepName: A C{str} step name.
+        @param steps: A C{dict} of steps.
         @param scriptArgs: A C{list} of C{str} arguments that should be put on
             the command line of all steps that have no dependencies.
         @param skip: If C{True}, the step should be skipped, which will be

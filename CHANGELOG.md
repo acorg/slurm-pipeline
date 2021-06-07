@@ -1,3 +1,8 @@
+# Version 3.2.1 - June 7, 2021
+
+Added `--printOutput` option to tell `slurm-pipeline.py` to print the
+output of running each step.
+
 # Version 3.2.0 - June 5, 2021
 
 The distinction between simulated and skipped steps has been removed as it
