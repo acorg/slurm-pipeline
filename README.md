@@ -1,7 +1,7 @@
 # slurm-pipeline
 
-A [Python](https://www.python.org) class for scheduling and examining
-[SLURM](http://slurm.schedmd.com/)
+A [Python](https://www.python.org) class and utility scripts for scheduling
+and examining [SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
 Runs under Python 2.7, 3.5-3.9, and [pypy](http://pypy.org/)
@@ -63,6 +63,11 @@ The `bin` directory of this repo contains the following Python scripts:
   of `slurm-pipeline.py` do not begin until the given pipeline has
   finished). See below for more information.
 * `slurm-pipeline-version.py` prints the version number.
+* `sbatch.py`, a utility script (<a href="#sbatch.py">described below</a>)
+  for _ad hoc_ scheduling of a command, optionally with its original standard
+  input broken into chunks to be passed to the command, allowing the optional
+  specification of subsequent scripts to be run on completion of the original
+  SLURM job(s).
 
 ## Pipeline specification
 
@@ -835,6 +840,33 @@ iteration whether it should be rescheduled. The
 [README](https://github.com/acorg/simple-slurm-loop/blob/master/README.md)
 shows how you could do that using the `--printFinal` argument to
 `slurm-pipeline-status.py`.
+
+<a id="sbatch.py"></a>
+## sbatch.py
+
+`sbatch.py` allows you to quickly run simple ad hoc SLURM pipelines
+from the command line with no need to for any configuration files. You give
+it a command to run and tell it how many lines of standard input to pass to
+each invocation. This is similar to what you can achieve by running `GNU
+parallel` with the `--pipe` and `-N` arguments, except all the invocations
+take place on compute nodes, as scheduled by SLURM.
+
+You can additionally specify commands that should be scheduled to run after
+all of standard input is processed, using the `--then` and (for error
+handling) `--else` options, or `--finally` for commands that should be run
+at the end irrespective of the exit status of the initial commands.
+
+This is intended to make it easy to do the rough equivalent of a shell
+command line, but the processing starts by (optionally) splitting standard
+input and the downstream commands are run on separate hosts and scheduled
+by SLURM instead of running on the same host with their I/O tied together
+via local UNIX kernel pipelines.
+
+See `sbatch.py --help` for usage.
+
+This script has the limitation that the same SLURM resources are requested
+for all jobs, including the `--then`, the `--else`, and the `--finally`
+jobs.
 
 ## Development
 

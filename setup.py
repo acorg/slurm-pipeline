@@ -30,6 +30,7 @@ setup(name='slurm-pipeline',
       author_email='tcj25@cam.ac.uk',
       keywords=['slurm'],
       scripts=[
+          'bin/sbatch.py',
           'bin/slurm-pipeline.py',
           'bin/slurm-pipeline-status.py',
           'bin/slurm-pipeline-version.py',
