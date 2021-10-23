@@ -4,8 +4,10 @@ import sys
 import argparse
 import subprocess
 import os
+from os import environ
 from os.path import exists, join
 from tempfile import mkdtemp
+from time import time, ctime
 
 CONDITION_NAMES = {
     'after': 'finally',
@@ -33,24 +35,26 @@ def makeParser():
               'shell metacharacters it will need to be quoted. If '
               '--linesPerJob is given, standard input will be broken into '
               'groups of lines and each group will be passed to a separate '
-              'invocation of the command.'))
+              'invocation of the command. All files related to the running '
+              'of the command (input, output, error, SLURM output) will be '
+              'created in the --outDir directory.'))
 
     parser.add_argument(
         '--linesPerJob', '-N', type=int, metavar='N',
         help=('The number of lines of standard input to give to each '
-              'invocation of the command. The final job will likely be given '
-              'fewer lines of input when the original standard input '
+              'invocation of the command. The final invocation will likely '
+              'receive fewer lines of input when the original standard input '
               'empties. If not specified, all lines of standard input are '
               'passed to the command.'))
 
     parser.add_argument(
         '--outDir', metavar='DIR',
-        help=('The directory where command input (if --noInline is used), '
-              'output, and error files will be created, along with sbatch '
-              '(if --dryRun is used). The directory will be created if it '
-              'does not already exist, and if this argument is omitted the '
-              'path to a newly-created directory will be printed to standard '
-              'error.'))
+        help=('The directory where command input (if --inline is not used), '
+              'output, and error files will be created, along with scripts to '
+              'run sbatch (if --dryRun is used) scripts. The directory will '
+              'be created if it does not already exist, and if this argument '
+              'is omitted the path to a newly-created directory will be '
+              'printed to standard error.'))
 
     parser.add_argument(
         '--prefix', default='',
@@ -59,10 +63,11 @@ def makeParser():
 
     parser.add_argument(
         '--afterok', nargs='*',
-        help=('An (optional) list of job ids to run after, assuming they all '
-              'finish successully. If the listed jobs do not finish '
-              'successully, the job(s) to run the main command will not '
-              'execute (but --else and --finally commands will run).'))
+        help=('An optional list of SLURM job ids that must all finish '
+              'successully before running the command. If the given jobs do '
+              'not all finish successully, the SLURM job(s) to run the main '
+              'command will not execute (but any --else and --finally '
+              'commands will run).'))
 
     parser.add_argument(
         '--mem', default='8G',
@@ -76,8 +81,8 @@ def makeParser():
 
     parser.add_argument(
         '--digits', default=5, metavar='N',
-        help=('The total number of digits to use in (zero-padded) file names '
-              'written to --outDir.'))
+        help=('The number of digits to use in (zero-padded) file names '
+              'written to --outDir.  Only used if --noArray is given.'))
 
     parser.add_argument(
         '--timePerJob', default='10:00',
@@ -120,29 +125,66 @@ def makeParser():
               'commands.'))
 
     parser.add_argument(
-        '--jobNamePrefix', '-J', default='sbatch-stdin-', metavar='PREFIX',
-        help=('The job name prefix. This will have a numeric count appended '
-              'to it for each job submitted to SLURM.'))
+        '--jobNamePrefix', '-J', default='', metavar='PREFIX',
+        help=('The job name prefix. This will have a stage ("initial", '
+              '"then", "else", or "finally") and a numeric count appended for '
+              'each job submitted to SLURM.'))
 
     parser.add_argument(
         '--dryRun', '-n', action='store_true',
         help='Do not actually do anything, just print what would be done.')
 
     parser.add_argument(
-        '--makeDoneFiles', action='store_true',
-        help=('Create empty .done files in --outDir when each command run by '
-              'SLURM is complete.'))
+        '--noArray', action='store_false', dest='array',
+        help='Do not use a SLURM job array.')
 
     parser.add_argument(
-        '--noInline', action='store_false', dest='inline',
-        help=('Put the input for each invocation of the command into a '
-              'separate file (as opposed to using a shell "here" document. '
-              'This will obviously result in one additional file being '
-              'created for each invocation of the command, which may not be '
-              'acceptable due to filesystem inode quota. If given, input for '
+        '--arrayMax', type=int, metavar='N',
+        help=('The maximum number of simultaneously running tasks SLURM '
+              'should allow when scheduling an array job.'))
+
+    parser.add_argument(
+        '--keepInputs', action='store_false', dest='removeInputs',
+        help=('Remove temporary input files (note that these are not created '
+              'if --inline is used) upon successful completion of jobs. '
+              'For jobs that end in error, the temporary input file is always '
+              'left in place.'))
+
+    parser.add_argument(
+        '--keepErrorFiles', action='store_true',
+        help=('Keep .err files in --outDir when each command run by '
+              'SLURM is completed. These files are otherwise automatically '
+              'removed - but only if they are empty.'))
+
+    parser.add_argument(
+        '--keepSlurmFiles', action='store_true',
+        help=('Keep .slurm files in --outDir when each command run by '
+              'SLURM is completed. These files are otherwise automatically '
+              'removed - but only if they are empty.'))
+
+    parser.add_argument(
+        '--makeDoneFiles', action='store_true',
+        help=('Create .done files in --outDir when each command run by '
+              'SLURM is successfully completed. If commands do not complete '
+              'successfully (exit with status zero), the .done files are '
+              'not created, and the standard output and error of the command '
+              'will be found in the corresponding .out and .err files in the '
+              '--outDir directory.'))
+
+    parser.add_argument(
+        '--inline', action='store_true',
+        help=('Put the input for each invocation of the command into a shell '
+              '"here" document (as opposed to using a separate input file for '
+              'each invocation). This results in one less file being created '
+              'for each invocation of the command, which may help avoid '
+              'reaching a filesystem inode quota. If not given, input for '
               'each call to the command is written to a file ending in ".in" '
               'in the --outDir directory. Note that these input files must be '
-              'left in place until SLURM actually runs the jobs.'))
+              'left in place until SLURM actually runs the jobs. The input '
+              'files will be removed when the command completes, unless '
+              '--keepInputs is used. This option is ignored unless --noArray '
+              'is used, because an array job requires that inputs are in '
+              'separate files.'))
 
     parser.add_argument(
         '--header', action='store_true',
@@ -159,23 +201,145 @@ def makeParser():
     return parser
 
 
-def filePrefix(count, args, after=None, condition=None):
+def filePrefix(count, args, condition=None, array=True, slurmHeader=False,
+               digits=0):
     """
     Make a file path prefix.
 
-    @param count: An C{int} count for numbering output files.
+    @param count: An C{int} count for numbering output files or C{None}
+        if the file should not be numbered.
     @param args: An argparse C{Namespace} with command-line options.
-    @param after: An iterable of C{str} job ids that need to complete
-        (successully) before this job is run. When this non-empty, the
-        filename will have the condition in it.
     @param condition: A C{str} dependency condition that would be given
         to sbatch via --dependency (see 'man sbatch').
+    @param slurmHeader: If C{True} and C{array} is C{True}, the file prefix
+        should be for use in a '#SBATCH' script header. Otherwise, the
+        prefix should use the SLURM environment variable SLURM_ARRAY_TASK_ID.
+    @param digits: An C{int} count for numbering output files or C{None}
+        if the file should not be numbered.
     @raise KeyError: if C{condition} is unknown (see 'names' below).
     @return: A C{str} file path prefix.
     """
+    if array:
+        suffix = '-%a' if slurmHeader else '-${SLURM_ARRAY_TASK_ID}'
+    else:
+        suffix = '' if count is None else f'-{count:0{digits}d}'
+
     return join(args.outDir,
-                f'{args.prefix}{CONDITION_NAMES[condition]}-'
-                f'{count:0{args.digits}d}')
+                f'{args.prefix}{CONDITION_NAMES[condition]}{suffix}')
+
+
+def creationInfo():
+    """
+    Produce information regarding the creation of a script.
+
+    @return: A C{str} with the date and id of the user.
+    """
+    return f'Generated {ctime(time())} by {environ.get("USER", "unknown")}.'
+
+
+def writeInputFiles(chunks, args, header=None):
+    """
+    Write out input files.
+
+    @param chunks: An iterable that produces iterables of C{str} lines
+        for each block of input.
+    @param args: An argparse C{Namespace} with command-line options.
+    @param header: A C{str} header line for the input to be given to the
+        command, including trailing newline, or C{None} for no header.
+    @return: The C{int} count of the number of files written.
+    """
+    count = 0
+    for count, lines in enumerate(chunks, start=1):
+        prefix = filePrefix(count, args, array=False)
+        stdin = (header or '') + (''.join(lines) if lines else '')
+        with open(f'{prefix}.in', 'w') as fp:
+            print(stdin, end='', file=fp)
+
+    return count
+
+
+def sbatchTextJobArray(nJobs, command, args, after=None, condition=None):
+    """
+    Produce shell script text suitable for passing to sbatch to run the
+    command using a job array.
+
+    @param nJobs: The C{int} number of jobs in the array.
+    @param command: The C{str} command to run.
+    @param after: An iterable of C{str} job ids that need to complete
+        (successully) before this job is run. When this is non-empty, the
+        script filename will have the condition in it.
+    @param condition: A C{str} dependency condition that would have been given
+        to sbatch via --dependency (see 'man sbatch') if --dryRun had not been
+        used.
+    @return: A C{str} with shell script text.
+    """
+    prefix = filePrefix(None, args, condition)
+    prefixNoZeroes = filePrefix(None, args, condition, digits=0)
+    headerPrefix = filePrefix(None, args, condition, slurmHeader=True)
+    in_ = f'{prefixNoZeroes}.in'
+    out = f'{prefix}.out'
+    err = f'{prefix}.err'
+    slurmOutHeader = f'{headerPrefix}.slurm'
+    slurmOut = f'{prefix}.slurm'
+    jobName = (f'{args.jobNamePrefix}{CONDITION_NAMES[condition]}')
+
+    if args.makeDoneFiles:
+        done = f'{prefix}.done'
+        rmDone = f'rm -f "{done}"'
+        touchDone = f'touch "{done}"'
+    else:
+        rmDone = touchDone = ''
+
+    if after:
+        dependencies = (
+            f'# Would be run with sbatch --dependency '
+            f'{condition or "afterok"}:' + ':'.join(map(str, after)))
+    else:
+        dependencies = ''
+
+    removeInput = f'rm "{in_}"' if args.removeInputs else ''
+
+    arrayMax = f'%{args.arrayMax}' if args.arrayMax is not None else ''
+
+    removeErrors = (
+        '' if args.keepErrorFiles else 'test -s "$err_" || rm "$err_"')
+
+    removeSlurm = (
+        '' if args.keepSlurmFiles else
+        f'test -e "{slurmOut}" && ( test -s "{slurmOut}" || rm "{slurmOut}" )')
+
+    return (f'''#!/bin/bash
+
+#SBATCH -J {jobName}
+#SBATCH -o {slurmOutHeader}
+#SBATCH -p {args.partition}
+#SBATCH --array=1-{nJobs}{arrayMax}
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task={args.cpus}
+#SBATCH --mem={args.mem}
+#SBATCH --time={args.timePerJob}
+
+set -Eeuo pipefail
+
+# {creationInfo()}
+{dependencies}
+
+count_=$(printf '%*d' {args.digits} $SLURM_ARRAY_TASK_ID | tr ' ' 0)
+out_=$(echo "{out}" | sed -e "s/-$SLURM_ARRAY_TASK_ID\\.out\\$/-$count_.out/")
+err_=$(echo "{err}" | sed -e "s/-$SLURM_ARRAY_TASK_ID\\.err\\$/-$count_.err/")
+
+{rmDone}
+
+exec > "$out_" 2> "$err_"
+
+{command} < "{in_}"
+
+{touchDone}
+{removeInput}
+{removeErrors}
+{removeSlurm}
+
+''')
 
 
 def sbatchText(lines, command, count, args, header=None, after=None,
@@ -199,7 +363,8 @@ def sbatchText(lines, command, count, args, header=None, after=None,
         used.
     @return: A C{str} with shell script text.
     """
-    prefix = filePrefix(count, args, after, condition)
+    prefix = filePrefix(count, args, condition, array=False,
+                        digits=args.digits)
     err = f'{prefix}.err'
     out = f'{prefix}.out'
     slurmOut = f'{prefix}.slurm'
@@ -221,6 +386,8 @@ def sbatchText(lines, command, count, args, header=None, after=None,
     else:
         dependencies = ''
 
+    removeInput = ''
+
     if stdin:
         if args.inline:
             # Use a shell 'here' document to provide the input.
@@ -233,59 +400,66 @@ def sbatchText(lines, command, count, args, header=None, after=None,
             with open(in_, 'w') as fp:
                 print(stdin, end='', file=fp)
             input_ = f'< {in_!r}'
+            if args.removeInputs:
+                removeInput = f'rm {in_!r}'
     else:
         input_ = ''
 
+    removeErrors = (
+        '' if args.keepErrorFiles else f'test -s {err!r} || rm {err!r}')
+
+    removeSlurm = (
+        '' if args.keepSlurmFiles else
+        f'test -e {slurmOut!r} && ( test -s {slurmOut!r} || rm {slurmOut!r} )')
+
     return (f'''#!/bin/bash
 
-#SBATCH --cpus-per-task={args.cpus}
 #SBATCH -J {jobName}
 #SBATCH -o {slurmOut}
 #SBATCH -p {args.partition}
 #SBATCH --nodes=1
+#SBATCH --cpus-per-task={args.cpus}
 #SBATCH --mem={args.mem}
 #SBATCH --time={args.timePerJob}
 
 set -Eeuo pipefail
 
+# {creationInfo()}
 {dependencies}
 
 {rmDone}
 
-( {command} ) > {out!r} 2> {err!r} {input_}
+exec > {out!r} 2> {err!r}
 
-test -s {err!r} || rm {err!r}
-test -e {slurmOut!r} && ( test -s {slurmOut!r} || rm {slurmOut!r} )
+{command} {input_}
 
 {touchDone}
+
+{removeInput}
+{removeErrors}
+{removeSlurm}
 ''')
 
 
-def writeSbatchFile(lines, command, count, args, header=None, after=None,
-                    condition=None):
+def writeSbatchFile(text, count, args, condition=None, digits=0):
     """
     Write a shell script suitable for passing to sbatch to run C{command} on
     the input in C{lines}.
 
-    @param lines: An iterable of C{str} input lines to be passed to the
-        command.
-    @param command: The C{str} command to run.
+    @param text: The C{str} sbatch command text.
     @param count: An C{int} count for numbering output files.
     @param args: An argparse C{Namespace} with command-line options.
-    @param header: A C{str} header line for the input to be given to the
-        command, including trailing newline, or C{None} for no header.
-    @param after: An iterable of C{str} job ids that need to complete
-        (successully) before this job is run. When this non-empty, the
-        script filename will have the condition in it.
     @param condition: A C{str} dependency condition that would have been given
         to sbatch via --dependency (see 'man sbatch') if --dryRun had not been
         used (may be C{None} if there are no dependencies).
+    @param digits: An C{int} count for numbering output files or C{None}
+        if the file should not be numbered.
     """
-    filename = filePrefix(count, args, after, condition) + '.sbatch'
+    prefix = filePrefix(count, args, condition, array=False, digits=digits)
+    filename = prefix + '.sbatch'
 
     with open(filename, 'w') as fp:
-        print(sbatchText(lines, command, count, args, header, after,
-                         condition), file=fp)
+        print(text, file=fp)
 
     # Give execute permission to anyone who had read permission.
     mode = os.stat(filename).st_mode
@@ -293,15 +467,12 @@ def writeSbatchFile(lines, command, count, args, header=None, after=None,
     os.chmod(filename, mode)
 
 
-def runSbatch(lines, command, count, args, header=None, after=None,
-              condition=None):
+def runSbatch(text, args, count=None, header=None, after=None, condition=None,
+              digits=0):
     """
-    Create and pass a shell script to sbatch to run the command on the input in
-    C{lines}.
+    Pass shell script text to sbatch.
 
-    @param lines: An iterable of C{str} input lines to be passed to the
-        command.
-    @param command: The C{str} command to run.
+    @param text: The C{str} sbatch script text.
     @param count: An C{int} count for numbering output files.
     @param args: An argparse C{Namespace} with command-line options.
     @param header: A C{str} header line for the input to be given to the
@@ -315,10 +486,8 @@ def runSbatch(lines, command, count, args, header=None, after=None,
         --dryRun was used).
     """
     if args.dryRun:
-        writeSbatchFile(lines, command, count, args, header, after, condition)
+        writeSbatchFile(text, count, args, condition, digits=digits)
         return
-
-    stdin = sbatchText(lines, command, count, args, header, after, condition)
 
     sbatchCommand = ['sbatch', '--kill-on-invalid-dep=yes']
     if after:
@@ -329,16 +498,16 @@ def runSbatch(lines, command, count, args, header=None, after=None,
     proc = subprocess.Popen(sbatchCommand, text=True,
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
-    stdout, stderr = proc.communicate(input=stdin)
+    stdout, stderr = proc.communicate(input=text)
 
     if proc.returncode:
-        filename = filePrefix(count, args, after, condition) + '.sbatch-error'
+        filename = filePrefix(count, args, condition) + '.sbatch-error'
 
         with open(filename, 'w') as fp:
-            print(stdin, file=fp)
+            print(text, file=fp)
 
-        print(f'sbatch submission failed! sbatch input left in {filename!r}. '
-              f'Exiting.', file=sys.stderr)
+        print(f'sbatch submission failed (exit status {proc.returncode})! '
+              f'sbatch input left in {filename!r}. Exiting.', file=sys.stderr)
 
         if stdout:
             print('sbatch standard output: {stdout!r}.', file=sys.stderr)
@@ -349,8 +518,8 @@ def runSbatch(lines, command, count, args, header=None, after=None,
         sys.exit(proc.returncode)
     else:
         # sbatch prints one line of output, with the job id in the 4th field.
-        # Note that although these are (currently) always integers, we are
-        # returning a string.
+        # Note that although these are (currently) always integers, we return
+        # a string.
         return stdout.split()[3]
 
 
@@ -390,6 +559,11 @@ def main(args):
     command via sbatch and for additional commands to be scheduled to run
     after the main processing completes.
     """
+    if args.inline and args.array:
+        print('--inline makes no sense unless you also use --noArray.',
+              file=sys.stderr)
+        sys.exit(1)
+
     if args.outDir is None:
         args.outDir = mkdtemp(prefix='sbatch-stdin')
         print(f'sbatch files will be stored in {args.outDir!r}.',
@@ -407,19 +581,26 @@ def main(args):
 
     # Submit the initial jobs.
     jobIds = []
-    for count, lines in enumerate(chunks):
-        # We use 'condition=None' below so we end up with 'initial' in the
-        # various file names, and rely on the sbatch --dependency condition
-        # being set to 'afterok' (in runSbatch) in this case.
-        jobId = runSbatch(lines, ' '.join(args.command), count, args, header,
-                          after=args.afterok, condition=None)
+    command = ' '.join(args.command)
+    if args.array:
+        nFiles = writeInputFiles(chunks, args, header)
+        stdin = sbatchTextJobArray(nFiles, command, args, after=args.afterok)
+        jobId = runSbatch(stdin, args, header=header, after=args.afterok)
         if jobId:
             jobIds.append(jobId)
+    else:
+        for count, lines in enumerate(chunks):
+            stdin = sbatchText(lines, command, count, args, header,
+                               after=args.afterok)
+            jobId = runSbatch(stdin, args, count=count, header=header,
+                              after=args.afterok, digits=args.digits)
+            if jobId:
+                jobIds.append(jobId)
 
     # Submit the '--then' jobs to run after all initial jobs (if they all
     # succeed).
     for count, command in enumerate(args.then or []):
-        jobId = runSbatch(None, command, count, args, after=jobIds,
+        jobId = runSbatch(command, args, count=count, after=jobIds,
                           condition='afterok')
         if jobId:
             jobIds = [jobId]
@@ -427,7 +608,7 @@ def main(args):
     # Submit the '--else' jobs to all run at once if anything fails.
     elseJobIds = []
     for count, command in enumerate(args.else_ or []):
-        jobId = runSbatch(None, command, count, args, after=jobIds,
+        jobId = runSbatch(command, args, count=count, after=jobIds,
                           condition='afternotok')
         if jobId:
             elseJobIds.append(jobId)
@@ -436,13 +617,13 @@ def main(args):
     # success or failure of the earlier steps.
     finalJobIds = []
     for count, command in enumerate(args.finally_ or []):
-        jobId = runSbatch(None, command, count, args,
+        jobId = runSbatch(command, args, count=count,
                           after=jobIds + elseJobIds, condition='after')
         if jobId:
             finalJobIds.append(jobId)
 
     # It's not clear which set of job ids to print. So for now just print
-    # those of the original jobs (or just the final --then job, if --then
+    # those of the original job(s) (or just the final --then job, if --then
     # was used).
     if args.printJobIds and jobIds:
         print('\n'.join(map(str, sorted(jobIds))))
