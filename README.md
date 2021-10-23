@@ -1,14 +1,14 @@
 # slurm-pipeline
 
-A [Python](https://www.python.org) class for scheduling and examining
-[SLURM](http://slurm.schedmd.com/)
+A [Python](https://www.python.org) class and utility scripts for scheduling
+and examining [SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
 Runs under Python 2.7, 3.5-3.9, and [pypy](http://pypy.org/)
 [Change log](CHANGELOG.md).
 [![Build Status](https://travis-ci.org/acorg/slurm-pipeline.svg?branch=master)](https://travis-ci.org/acorg/slurm-pipeline)
 
-Funding for the development of this package comes from:
+Funding for the original development of this package came from:
 
 * the European Union Horizon 2020 research and innovation programme,
   [COMPARE](http://www.compare-europe.eu/) grant (agreement No. 643476), and
@@ -63,6 +63,13 @@ The `bin` directory of this repo contains the following Python scripts:
   of `slurm-pipeline.py` do not begin until the given pipeline has
   finished). See below for more information.
 * `slurm-pipeline-version.py` prints the version number.
+* `sbatch.py`, a utility script (<a href="#sbatch.py">described below</a>)
+  for _ad hoc_ scheduling of a command, optionally with its original
+  standard input broken into chunks to be passed to the command and the
+  specification of subsequent scripts to be run on completion of the
+  original SLURM job(s).
+* `remove-repeated-headers.py`, a simple helper script for post-processing
+  output files created by SLURM following the use of `sbatch.py`.
 
 ## Pipeline specification
 
@@ -836,11 +843,202 @@ iteration whether it should be rescheduled. The
 shows how you could do that using the `--printFinal` argument to
 `slurm-pipeline-status.py`.
 
+<a id="sbatch.py"></a>
+## sbatch.py
+
+`sbatch.py` allows you to quickly run simple ad hoc SLURM pipelines
+from the command line with no need to for any configuration files. You give
+it a command to run and tell it how many lines of standard input to pass to
+each invocation. This is similar to what you can achieve by running `GNU
+parallel` with the `--pipe` and `-N` arguments, except all the invocations
+take place on compute nodes, as scheduled by SLURM.
+
+Output from each invocation of the command will appear in a file ending in
+`.out` in the directory specified by `--outDir`. These files are numbered
+with leading zeroes so you can e.g., `cat out/*.out` and the order of the
+collected output will correspond to the order of lines on standard output
+(see also the `remove-repeated-headers.py` helper script mentioned below).
+
+Error output from running the command will be placed in `.out` files in the
+`--outDir` directory.
+
+If not given, an output directory will be created and its path printed.
+
+By default, The jobs are submitted to SLURM using a
+[Job Array](https://slurm.schedmd.com/job_array.html) for efficient
+scehduling of a potentially large number of jobs. This can be disabled with
+the `--noArray` option.
+
+Use `--dryRun` (or `-n`) to have `sbatch.py` write out the files it would
+submit to SLURM (these will be put into the directory specified by
+`--outDir`).
+
+You can additionally specify commands that should be scheduled to run after
+all of standard input is processed, using the `--then` and (for error
+handling) `--else` options, or `--finally` for commands that should be run
+at the end irrespective of the exit status of the initial commands.  This
+is intended to make it easy to do the rough equivalent of a shell command
+line, but the processing starts by (optionally) splitting standard input
+and the downstream commands are run on separate hosts and scheduled by
+SLURM instead of running on the same host with their I/O tied together via
+local UNIX kernel pipelines.
+
+If standard input starts with a (single) header line (e.g., is a CSV or TSV
+file), use `--header` to tell `sbatch.py` to put a header at the start of
+each input files if multiple jobs are scheduled.
+
+The helper script `remove-repeated-headers.py` can be used to remove
+repeated headers from output files if these each contain a header, allowing
+you to `cat` all output files into `remove-repeated-headers.py` to produce
+a single output file with a single header line (this may of course differ
+from the header in standard input, if any).
+
+See `sbatch.py --help` for additional usage options.
+
+This script has the limitation that the SLURM resources requested for all
+the initial jobs, will also be requested for any `--then`, the `--else`,
+and the `--finally` jobs.
+
+### Example sbatch.py usage
+
+#### Dummy input data
+
+To create some dummy input data, use `seq` to print numbers
+
+```sh
+$ seq 5
+1
+2
+3
+4
+5
+
+$ seq 1000000 | wc -l
+1000000
+```
+
+#### Dummy work
+
+The commands below send numbers on standard input to `gzip` but throw the
+`gzip` output away. E.g.
+
+```sh
+$ seq 10000 | gzip > /dev/null
+```
+
+#### Dummy output processing
+
+Some examples will use use `awk` to add up numbers. E.g., add the first
+10,000 natural numbers:
+
+```sh
+$ seq 10000 | awk '{sum += $1} END {print sum}'
+50005000
+```
+
+### Using parallel on a compute node
+
+First, here's a command that can simply be run with
+[GNU parallel](https://www.gnu.org/software/parallel/) on a single compute
+node (nothing to do with SLURM).
+
+```sh
+# Get a compute node with 32 cores.
+$ srun --pty --cpus-per-task 32 --mem=8G bash -i
+
+# This takes about 30 seconds on the node.
+$ seq 10000 | parallel --progress 'seq {} | gzip > /dev/null'
+```
+
+### Using sbatch.py
+
+We can use `sbatch.py` to do the above, but splitting the input into chunks
+and running each chunk via `parallel` on a separate compute node:
+
+```sh
+$ seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
+              "parallel 'seq {} | gzip > /dev/null'"
+```
+
+Use `--makeDoneFiles` to create empty `.done` files in the output directory
+when jobs finish (successfully).
+
+Use `--dryRun` (or `-n`) to tell `sbatch.py` not to run `sbatch` but just
+to write out the various files that could later be given to `sbatch`:
+
+```sh
+$ seq 10000 | sbatch.py --outDir out --linesPerJob 1000 --dryRun \
+              "parallel 'seq {} | gzip > /dev/null'"
+```
+
+To see the input files that were used, use `--keepInputs` (then look for
+`.in` files in the `--outDir` directory).
+
+Use `--noArray` to create separate `.sbatch` command scripts for each job,
+and `--inline` to use "here" documents in the scripts, to save on making
+input files. **Note** that using `--noArray` will mean more calls to
+`sbatch` to submit jobs. This can be a bad idea, so `--noArray` should be
+used with care, preferably after running with `--dryRun` to see how many
+`sbatch` scripts and input files are created.
+
+#### Post-processing with --then
+
+You can use `--then` to schedule a command to be run after everything
+completes (successfully).
+
+So we change the original processing to also echo the number (see `echo {}`
+below), and when everything is done, `cat` all the result files, add the
+numbers, and put the sum into a file called `RESULT.`
+
+```sh
+$ seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
+              "parallel 'seq {} | gzip > /dev/null; echo {}'" \
+              --then 'cat out/initial*.out | awk "{sum += \$1} END {print sum}" > RESULT'
+$ cat RESULT
+50005000
+```
+
+Or add the numbers, send the result into Slack, and then do some clean-up:
+
+```sh
+seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
+              "parallel 'seq {} | gzip > /dev/null; echo {}'" \
+              --then 'cat out/initial*.out | awk "{sum += \$1} END {print sum}" > RESULT' \
+              --then "tell-slack.py '$USER, your job has finished (total = $(cat RESULT)).'" \
+              --then 'rm -r out' \
+              --else "tell-slack.py '$USER, your job failed. Have a look in $(pwd)/out'"
+```
+
+#### Error post-processing with --else
+
+Use `--else` for error handling (may be repeated):
+
+```sh
+seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
+              "parallel 'seq {} | gzip > /dev/null; echo {}'" \
+              --then 'cat out/initial*.out | awk "{sum += \$1} END {print sum}" > RESULT' \
+              --then "tell-slack.py '$USER, your job has finished (total = $(cat RESULT)).'" \
+              --else "tell-slack.py '$USER, your job failed. Have a look in $(pwd)/out'"
+```
+
+#### Final post-processing with --finally
+
+Add unconditional final commands via `--finally` (may also be repeated):
+
+```sh
+$ seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
+              "parallel 'seq {} | gzip > /dev/null; echo {}'" \
+              --then 'cat out/initial*.out | awk "{sum += \$1} END {print sum}" > RESULT' \
+              --finally 'rm -r out' \
+              --finally 'echo Run finished at $(date) > DONE'
+```
+
+
 ## Development
 
-If you like to work on the code or just to run the tests having cloned the
-repo, you'll probabaly want to install some development modules. The
-easiest way is to just
+If you would like to work on the code or just to run the tests after
+cloning the repo, you'll probabaly want to install some development
+modules. The easiest way is to just
 
 ```sh
 $ pip install -r requirements-dev.txt
@@ -852,11 +1050,11 @@ runner).
 
 ### Running tests
 
-Any/all of the following should work for you:
+Any/all of the following should work:
 
 ```sh
 $ tox # To run the tests on multiple Python versions (see tox.ini).
-$ make check
+$ make check  # Run tests with pytest.
 $ make tcheck # If you "pip install Twisted" first.
 $ python -m discover -v  # If you run "pip install discover" first.
 ```
