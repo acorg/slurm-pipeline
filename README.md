@@ -36,11 +36,11 @@ Using [git](https://git-scm.com/downloads):
 $ git clone https://github.com/acorg/slurm-pipeline
 $ cd slurm-pipeline
 
-# Install dependencies.
-$ pip install -r requirements.txt
+# Install, including development dependencies.
+$ pip install -e '.[dev]'
 
-# Install.
-$ python setup.py install
+# Run the tests.
+$ pytest
 ```
 
 ## Scripts

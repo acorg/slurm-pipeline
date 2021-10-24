@@ -1,10 +1,5 @@
 from unittest import TestCase
-from six import assertRaisesRegex
-
-try:
-    from unittest.mock import patch
-except ImportError:
-    from mock import patch
+from unittest.mock import patch
 
 from slurm_pipeline.error import SAcctError
 from slurm_pipeline.sacct import SAcct
@@ -25,7 +20,7 @@ class TestSAcct(TestCase):
             r"^Encountered OSError \(No such file or directory\) when running "
             "'sacct -P --format JobId,JobName,State,Elapsed,Nodelist "
             "--jobs 35,40'$")
-        assertRaisesRegex(self, SAcctError, error,  SAcct, {35, 40})
+        self.assertRaisesRegex(SAcctError, error,  SAcct, {35, 40})
 
     @patch('subprocess.check_output')
     def testSacctCalledAsExpectedWhenNoArgsPassed(self, subprocessMock):
@@ -56,7 +51,7 @@ class TestSAcct(TestCase):
 
         error = ('^sacct did not return information about the following job '
                  'id: 3$')
-        assertRaisesRegex(self, SAcctError, error,  SAcct, {1, 2, 3})
+        self.assertRaisesRegex(SAcctError, error,  SAcct, {1, 2, 3})
 
     @patch('subprocess.check_output')
     def testSacctCalledAsExpectedWhenFieldNamesPassed(self, subprocessMock):
@@ -90,7 +85,7 @@ class TestSAcct(TestCase):
         )
         error = ("^Job id 1 found more than once in 'sacct -P --format "
                  "JobId,JobName,State,Elapsed,Nodelist --jobs 1' output$")
-        assertRaisesRegex(self, SAcctError, error,  SAcct, {1})
+        self.assertRaisesRegex(SAcctError, error,  SAcct, {1})
 
     @patch('subprocess.check_output')
     def testJobsDict(self, subprocessMock):

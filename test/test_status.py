@@ -1,10 +1,5 @@
 from unittest import TestCase
-from six import assertRaisesRegex
-
-try:
-    from unittest.mock import patch
-except ImportError:
-    from mock import patch
+from unittest.mock import patch
 
 from slurm_pipeline.error import SpecificationError
 from slurm_pipeline.status import SlurmPipelineStatus
@@ -21,8 +16,8 @@ class TestSlurmPipelineStatus(TestCase):
         SlurmPipelineStatus, a SpecificationError must be raised.
         """
         error = "^The specification status has no top-level 'scheduledAt' key$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineStatus,
-                          {})
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineStatus,
+                               {})
 
     @patch('subprocess.check_output')
     def testFinalJobsWithNoJobs(self, subprocessMock):

@@ -5,4 +5,4 @@ __all__ = ['SlurmPipeline', 'SlurmPipelineStatus']
 
 # Note that the version string must have the following format, otherwise it
 # will not be found by the version() function in ../setup.py
-__version__ = '3.2.2'
+__version__ = '4.0.0'

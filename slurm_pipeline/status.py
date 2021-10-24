@@ -1,5 +1,3 @@
-from __future__ import division
-
 from .base import SlurmPipelineBase
 from .error import SpecificationError
 from .sacct import SAcct

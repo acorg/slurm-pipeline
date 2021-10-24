@@ -7,8 +7,6 @@ specification that includes job ids. The printed status can be saved to a file
 and later given to slurm-pipeline-status.py to monitor job progress.
 """
 
-from __future__ import print_function
-
 import sys
 import os
 import argparse

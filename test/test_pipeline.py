@@ -1,6 +1,6 @@
 from os import X_OK, path
 from unittest import TestCase
-from six import assertRaisesRegex
+from unittest.mock import ANY, call, patch
 from json import dumps
 import platform
 from subprocess import CalledProcessError
@@ -9,12 +9,6 @@ from sys import version_info
 from slurm_pipeline.pipeline import SlurmPipeline, DEVNULL
 from slurm_pipeline.error import SchedulingError, SpecificationError
 from slurm_pipeline.utils import getlogin
-
-
-try:
-    from unittest.mock import ANY, call, patch
-except ImportError:
-    from mock import ANY, call, patch
 
 PYPY = platform.python_implementation() == 'PyPy'
 
@@ -32,16 +26,16 @@ class TestSlurmPipeline(TestCase):
         isdirMock.return_value = False
         error = (r"^Specification step 1 specifies a working directory "
                  r"\('dir'\) that does not exist")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'cwd': 'dir',
-                                      'name': 'name',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipeline,
+                               {
+                                   'steps': [
+                                       {
+                                           'cwd': 'dir',
+                                           'name': 'name',
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -52,15 +46,15 @@ class TestSlurmPipeline(TestCase):
         accessMock.return_value = False
 
         error = "^The script 'script' in step 1 is not executable$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipeline,
+                               {
+                                   'steps': [
+                                       {
+                                           'name': 'name',
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -71,15 +65,15 @@ class TestSlurmPipeline(TestCase):
         """
         existsMock.return_value = False
         error = "^The script 'script' in step 1 does not exist$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipeline,
+                               {
+                                   'steps': [
+                                       {
+                                           'name': 'name',
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -161,20 +155,20 @@ class TestSlurmPipeline(TestCase):
         """
         error = (r"^Step 2 \('name2'\) is a 'collect' step but does not have "
                  r"any dependencies$")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name1',
-                                      'script': 'script1',
-                                  },
-                                  {
-                                      'collect': True,
-                                      'name': 'name2',
-                                      'script': 'script2',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipeline,
+                               {
+                                   'steps': [
+                                       {
+                                           'name': 'name1',
+                                           'script': 'script1',
+                                       },
+                                       {
+                                           'collect': True,
+                                           'name': 'name2',
+                                           'script': 'script2',
+                                       },
+                                   ]
+                               })
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -185,21 +179,21 @@ class TestSlurmPipeline(TestCase):
         """
         error = (r"^Step 2 \('name2'\) is a 'collect' step but does not have "
                  r"any dependencies$")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipeline,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name1',
-                                      'script': 'script1',
-                                  },
-                                  {
-                                      'collect': True,
-                                      'dependencies': [],
-                                      'name': 'name2',
-                                      'script': 'script2',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipeline,
+                               {
+                                   'steps': [
+                                       {
+                                           'name': 'name1',
+                                           'script': 'script1',
+                                       },
+                                       {
+                                           'collect': True,
+                                           'dependencies': [],
+                                           'name': 'name2',
+                                           'script': 'script2',
+                                       },
+                                   ]
+                               })
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -218,8 +212,8 @@ class TestSlurmPipeline(TestCase):
                 ]
             })
         error = "^First step 'xxx' not found in specification$"
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
-                          firstStep='xxx')
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule,
+                               firstStep='xxx')
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -238,8 +232,8 @@ class TestSlurmPipeline(TestCase):
                 ]
             })
         error = "^Last step 'xxx' not found in specification$"
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
-                          lastStep='xxx')
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule,
+                               lastStep='xxx')
 
     @patch('os.access')
     @patch('os.path.exists')
@@ -263,8 +257,8 @@ class TestSlurmPipeline(TestCase):
             })
         error = (r"^Last step \('name1'\) occurs before first step "
                  r"\('name2'\) in the specification$")
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
-                          firstStep='name2', lastStep='name1')
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule,
+                               firstStep='name2', lastStep='name1')
 
     def testScheduledTime(self):
         """
@@ -353,7 +347,7 @@ class TestSlurmPipeline(TestCase):
         error = ("^Task name 'xxx' was output with non-numeric job ids by "
                  "'script1' script in step named 'name1'. Output line was "
                  "'TASK: xxx 123 hello'$")
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule)
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule)
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -402,7 +396,7 @@ class TestSlurmPipeline(TestCase):
         error = (r"^Task name 'xxx' was output with a duplicate in "
                  r"its job ids \[123, 123\] by 'script1' script in "
                  r"step named 'name1'$")
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule)
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule)
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1015,8 +1009,8 @@ class TestSlurmPipeline(TestCase):
             })
         error = (r"^Script argument \"don't ask me\" contains a single "
                  r"quote, which is currently not supported\.$")
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
-                          scriptArgs=["don't ask me", 3])
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule,
+                               scriptArgs=["don't ask me", 3])
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1536,8 +1530,8 @@ class TestSlurmPipeline(TestCase):
                     },
                 ]
             })
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
-                          skip={'xxx'})
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule,
+                               skip={'xxx'})
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1557,8 +1551,8 @@ class TestSlurmPipeline(TestCase):
                     },
                 ]
             })
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
-                          skip={'xxx', 'yyy'})
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule,
+                               skip={'xxx', 'yyy'})
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1814,7 +1808,7 @@ class TestSlurmPipeline(TestCase):
                 ],
             })
         error = r"^Nice \(priority\) value 'x' is not numeric$"
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule, nice='x')
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule, nice='x')
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1836,8 +1830,8 @@ class TestSlurmPipeline(TestCase):
             })
         error = (r"^Nice \(priority\) value 10001 is outside the allowed "
                  r"\[-10000, 10000\] range$")
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
-                          nice=10001)
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule,
+                               nice=10001)
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1859,8 +1853,8 @@ class TestSlurmPipeline(TestCase):
             })
         error = (r"^Nice \(priority\) value -10001 is outside the allowed "
                  r"\[-10000, 10000\] range$")
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule,
-                          nice=-10001)
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule,
+                               nice=-10001)
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1898,7 +1892,7 @@ class TestSlurmPipeline(TestCase):
                      r"directory 'dir'\. Attempted command: 'command.sh'\. "
                      r"Exit status: 3\.$")
 
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule)
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule)
 
     @patch('subprocess.check_output')
     @patch('os.access')
@@ -1929,4 +1923,4 @@ class TestSlurmPipeline(TestCase):
             r"'dir'\. Attempted command: 'script1'\. Error: No such file or "
             r"directory: script1$")
 
-        assertRaisesRegex(self, SchedulingError, error, sp.schedule)
+        self.assertRaisesRegex(SchedulingError, error, sp.schedule)

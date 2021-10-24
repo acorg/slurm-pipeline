@@ -28,7 +28,7 @@ setup(name='slurm-pipeline',
       download_url='https://github.com/acorg/slurm-pipeline',
       author='Terry Jones',
       author_email='tcj25@cam.ac.uk',
-      keywords=['slurm'],
+      keywords=['slurm', 'sbatch'],
       scripts=[
           'bin/remove-repeated-headers.py',
           'bin/sbatch.py',
@@ -37,7 +37,6 @@ setup(name='slurm-pipeline',
           'bin/slurm-pipeline-version.py',
       ],
       classifiers=[
-          'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3',
           'Development Status :: 4 - Beta',
           'Intended Audience :: Developers',
@@ -45,8 +44,16 @@ setup(name='slurm-pipeline',
           'Operating System :: OS Independent',
           'Topic :: Software Development :: Libraries :: Python Modules',
       ],
-      license='MIT',
       install_requires=[
-          'six>=1.10.0',
+          'pytest>=6.2.2',
       ],
-      description='A Python class for scheduling SLURM jobs')
+      extras_require={
+        'dev': [
+            'flake8',
+            'pycodestyle',
+            'pytest',
+        ]
+      },
+      license='MIT',
+      description=(
+          'A Python class and utility script for scheduling SLURM jobs'))

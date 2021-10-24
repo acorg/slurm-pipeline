@@ -1,3 +1,11 @@
+# Version 4.0.0 - October 23, 2021
+
+Removed support for Python 2.7. Added conda building.
+
+# Version 3.2.2 - October 23, 2021
+
+Added `sbatch.py` utility script (and `remove-repeated-headers.py` helper).
+
 # Version 3.2.1 - June 7, 2021
 
 Added `--printOutput` option to tell `slurm-pipeline.py` to print the

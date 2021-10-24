@@ -1,4 +1,3 @@
-from six import string_types
 from json import load, dumps
 from collections import OrderedDict
 
@@ -16,7 +15,7 @@ class SlurmPipelineBase(object):
         specification.
     """
     def __init__(self, specification):
-        if isinstance(specification, string_types):
+        if isinstance(specification, str):
             specification = self._loadSpecification(specification)
         self.checkSpecification(specification)
         self.specification = specification.copy()
@@ -60,7 +59,7 @@ class SlurmPipelineBase(object):
                 raise SpecificationError(
                     "Step %d does not have a 'name' key" % count)
 
-            if not isinstance(stepName, string_types):
+            if not isinstance(stepName, str):
                 raise SpecificationError(
                     "The 'name' key in step %d is not a string" % count)
 
@@ -69,7 +68,7 @@ class SlurmPipelineBase(object):
                     "Step %d (%r) does not have a 'script' key" %
                     (count, stepName))
 
-            if not isinstance(step['script'], string_types):
+            if not isinstance(step['script'], str):
                 raise SpecificationError(
                     "The 'script' key in step %d (%r) is not a string" %
                     (count, stepName))

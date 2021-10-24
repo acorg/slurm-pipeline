@@ -1,8 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch, mock_open
 
-from six.moves import builtins
-from six import assertRaisesRegex, PY3
+import builtins
 from json import dumps
 import platform
 
@@ -28,14 +27,10 @@ class TestSlurmPipelineBase(TestCase):
                 # different under different pypy versions and on my local
                 # machine.
                 self.assertRaises(ValueError, SlurmPipelineBase, 'file')
-            elif PY3:
-                error = r'^Expecting value: line 1 column 1 \(char 0\)$'
-                assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
-                                  'file')
             else:
-                error = '^No JSON object could be decoded$'
-                assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
-                                  'file')
+                error = r'^Expecting value: line 1 column 1 \(char 0\)$'
+                self.assertRaisesRegex(ValueError, error, SlurmPipelineBase,
+                                       'file')
 
     def testInvalidJSON(self):
         """
@@ -49,15 +44,11 @@ class TestSlurmPipelineBase(TestCase):
                 # different under different pypy versions and on my local
                 # machine.
                 self.assertRaises(ValueError, SlurmPipelineBase, 'file')
-            elif PY3:
+            else:
                 error = (r'^Expecting property name enclosed in double '
                          r'quotes: line 1 column 2 \(char 1\)$')
-                assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
-                                  'file')
-            else:
-                error = r'^Expecting object: line 1 column 1 \(char 0\)$'
-                assertRaisesRegex(self, ValueError, error, SlurmPipelineBase,
-                                  'file')
+                self.assertRaisesRegex(ValueError, error, SlurmPipelineBase,
+                                       'file')
 
     def testJSONList(self):
         """
@@ -68,8 +59,8 @@ class TestSlurmPipelineBase(TestCase):
         with patch.object(builtins, 'open', mock_open(read_data=data)):
             error = (r'^The specification must be a dict \(i\.e\., a JSON '
                      r'object when loaded from a file\)$')
-            assertRaisesRegex(self, SpecificationError, error,
-                              SlurmPipelineBase, 'file')
+            self.assertRaisesRegex(SpecificationError, error,
+                                   SlurmPipelineBase, 'file')
 
     def testList(self):
         """
@@ -78,8 +69,8 @@ class TestSlurmPipelineBase(TestCase):
         """
         error = (r'^The specification must be a dict \(i\.e\., a JSON '
                  r'object when loaded from a file\)$')
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          [])
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               [])
 
     def testNoSteps(self):
         """
@@ -87,8 +78,8 @@ class TestSlurmPipelineBase(TestCase):
         SpecificationError must be raised.
         """
         error = "^The specification must have a top-level 'steps' key$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {})
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {})
 
     def testStepsMustBeAList(self):
         """
@@ -96,8 +87,8 @@ class TestSlurmPipelineBase(TestCase):
         is a list, a SpecificationError must be raised.
         """
         error = "^The 'steps' key must be a list$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {'steps': None})
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {'steps': None})
 
     def testNonDictionaryStep(self):
         """
@@ -105,12 +96,12 @@ class TestSlurmPipelineBase(TestCase):
         SpecificationError must be raised.
         """
         error = '^Step 1 is not a dictionary$'
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'steps': [
-                                  None,
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'steps': [
+                                       None,
+                                   ]
+                               })
 
     def testStepWithoutScript(self):
         """
@@ -118,18 +109,18 @@ class TestSlurmPipelineBase(TestCase):
         'script' key, a SpecificationError must be raised.
         """
         error = r"^Step 2 \('name2'\) does not have a 'script' key$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name1',
-                                      'script': 'script',
-                                  },
-                                  {
-                                      'name': 'name2',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'steps': [
+                                       {
+                                           'name': 'name1',
+                                           'script': 'script',
+                                       },
+                                       {
+                                           'name': 'name2',
+                                       },
+                                   ]
+                               })
 
     def testSkipNotAList(self):
         """
@@ -137,16 +128,16 @@ class TestSlurmPipelineBase(TestCase):
         a SpecificationError must be raised.
         """
         error = "^The 'skip' key must be a list$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'skip': 'xxx',
-                              'steps': [
-                                  {
-                                      'name': 'name1',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'skip': 'xxx',
+                                   'steps': [
+                                       {
+                                           'name': 'name1',
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     def testSkipUnknownStep(self):
         """
@@ -154,16 +145,16 @@ class TestSlurmPipelineBase(TestCase):
         that does not exist, a SpecificationError must be raised.
         """
         error = "^The 'skip' key mentions a non-existent step, 'xxx'$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'skip': ['xxx'],
-                              'steps': [
-                                  {
-                                      'name': 'name1',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'skip': ['xxx'],
+                                   'steps': [
+                                       {
+                                           'name': 'name1',
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     def testNonStringScript(self):
         """
@@ -171,15 +162,15 @@ class TestSlurmPipelineBase(TestCase):
         must be raised.
         """
         error = r"^The 'script' key in step 1 \('name'\) is not a string$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name',
-                                      'script': None,
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'steps': [
+                                       {
+                                           'name': 'name',
+                                           'script': None,
+                                       },
+                                   ]
+                               })
 
     def testStepWithoutName(self):
         """
@@ -187,14 +178,14 @@ class TestSlurmPipelineBase(TestCase):
         'name' key, a SpecificationError must be raised.
         """
         error = "^Step 1 does not have a 'name' key$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'steps': [
-                                  {
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'steps': [
+                                       {
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     def testNonStringName(self):
         """
@@ -202,15 +193,15 @@ class TestSlurmPipelineBase(TestCase):
         must be raised.
         """
         error = "^The 'name' key in step 1 is not a string$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'steps': [
-                                  {
-                                      'name': None,
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'steps': [
+                                       {
+                                           'name': None,
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     def testDuplicateName(self):
         """
@@ -219,19 +210,19 @@ class TestSlurmPipelineBase(TestCase):
         """
         error = ("^The name 'name' of step 2 was already used in an "
                  "earlier step$")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name',
-                                      'script': 'script1',
-                                  },
-                                  {
-                                      'name': 'name',
-                                      'script': 'script2',
-                                  },
-                              ],
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'steps': [
+                                       {
+                                           'name': 'name',
+                                           'script': 'script1',
+                                       },
+                                       {
+                                           'name': 'name',
+                                           'script': 'script2',
+                                       },
+                                   ],
+                               })
 
     def testNonListDependencies(self):
         """
@@ -239,16 +230,16 @@ class TestSlurmPipelineBase(TestCase):
         SpecificationError must be raised.
         """
         error = r"^Step 1 \('name'\) has a non-list 'dependencies' key$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'steps': [
-                                  {
-                                      'dependencies': None,
-                                      'name': 'name',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'steps': [
+                                       {
+                                           'dependencies': None,
+                                           'name': 'name',
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     def testNonExistentDependency(self):
         """
@@ -257,20 +248,20 @@ class TestSlurmPipelineBase(TestCase):
         """
         error = (r"^Step 2 \('name2'\) depends on a non-existent \(or "
                  r"not-yet-defined\) step: 'unknown'$")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'steps': [
-                                  {
-                                      'name': 'name1',
-                                      'script': 'script',
-                                  },
-                                  {
-                                      'dependencies': ['unknown'],
-                                      'name': 'name2',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'steps': [
+                                       {
+                                           'name': 'name1',
+                                           'script': 'script',
+                                       },
+                                       {
+                                           'dependencies': ['unknown'],
+                                           'name': 'name2',
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     def testStepDependentOnItself(self):
         """
@@ -278,16 +269,16 @@ class TestSlurmPipelineBase(TestCase):
         a SpecificationError must be raised.
         """
         error = r"^Step 1 \('name'\) depends itself$"
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'steps': [
-                                  {
-                                      'dependencies': ['name'],
-                                      'name': 'name',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'steps': [
+                                       {
+                                           'dependencies': ['name'],
+                                           'name': 'name',
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     def testNonYetDefinedDependency(self):
         """
@@ -297,20 +288,20 @@ class TestSlurmPipelineBase(TestCase):
         """
         error = (r"^Step 1 \('name1'\) depends on a non-existent \(or "
                  r"not-yet-defined\) step: 'name2'$")
-        assertRaisesRegex(self, SpecificationError, error, SlurmPipelineBase,
-                          {
-                              'steps': [
-                                  {
-                                      'dependencies': ['name2'],
-                                      'name': 'name1',
-                                      'script': 'script',
-                                  },
-                                  {
-                                      'name': 'name2',
-                                      'script': 'script',
-                                  },
-                              ]
-                          })
+        self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase,
+                               {
+                                   'steps': [
+                                       {
+                                           'dependencies': ['name2'],
+                                           'name': 'name1',
+                                           'script': 'script',
+                                       },
+                                       {
+                                           'name': 'name2',
+                                           'script': 'script',
+                                       },
+                                   ]
+                               })
 
     def testSpecificationIsStored(self):
         """
