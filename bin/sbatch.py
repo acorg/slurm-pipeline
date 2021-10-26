@@ -265,6 +265,7 @@ def sbatchTextJobArray(nJobs, command, args, after=None, condition=None):
 
     @param nJobs: The C{int} number of jobs in the array.
     @param command: The C{str} command to run.
+    @param args: An argparse C{Namespace} with command-line options.
     @param after: An iterable of C{str} job ids that need to complete
         (successully) before this job is run. When this is non-empty, the
         script filename will have the condition in it.

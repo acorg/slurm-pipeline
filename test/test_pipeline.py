@@ -5,10 +5,10 @@ from json import dumps
 import platform
 from subprocess import CalledProcessError
 from sys import version_info
+from getpass import getuser
 
 from slurm_pipeline.pipeline import SlurmPipeline, DEVNULL
 from slurm_pipeline.error import SchedulingError, SpecificationError
-from slurm_pipeline.utils import getlogin
 
 PYPY = platform.python_implementation() == 'PyPy'
 
@@ -1676,7 +1676,7 @@ class TestSlurmPipeline(TestCase):
         specification = sp.schedule(firstStep='name2', force=True)
         expected = dumps(
             {
-                'user': getlogin(),
+                'user': getuser(),
                 'firstStep': 'name2',
                 'lastStep': None,
                 'nice': None,

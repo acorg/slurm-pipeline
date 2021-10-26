@@ -1,5 +1,4 @@
 import os
-import pwd
 from time import gmtime, strftime
 
 
@@ -15,11 +14,3 @@ def secondsToTime(seconds, sacctCompatible=False):
     return strftime(
         '%Y-%m-%d' + ('T' if sacctCompatible else ' ') + '%H:%M:%S',
         gmtime(seconds))
-
-
-def getlogin():
-    """
-    Get the current user's login name.
-    """
-    # This duplicates os.getlogin which fails under TravisCI.
-    return pwd.getpwuid(os.getuid()).pw_name

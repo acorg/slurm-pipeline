@@ -4,6 +4,7 @@ import re
 import time
 import subprocess
 from collections import defaultdict
+from getpass import getuser
 
 try:
     from subprocess import DEVNULL  # py3k
@@ -12,7 +13,6 @@ except ImportError:
 
 from .base import SlurmPipelineBase
 from .error import SchedulingError, SpecificationError
-from .utils import getlogin
 
 
 class SlurmPipeline(SlurmPipelineBase):
@@ -133,7 +133,7 @@ class SlurmPipeline(SlurmPipelineBase):
             'sleep': sleep,
             'startAfter': startAfter,
             'steps': steps,
-            'user': getlogin(),
+            'user': getuser(),
         })
 
         environ['SP_FORCE'] = str(int(force))

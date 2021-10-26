@@ -1,3 +1,8 @@
+# Version 4.0.2 - October 26, 2021
+
+Use `getpass.getuser()` instead of `pwd.getpwuid(os.getuid()).pw_name` to
+get the user's name (since the `import pwd` fails on windows).
+
 # Version 4.0.1 - October 26, 2021
 
 Added `LICENSE.txt` for conda forge distribution.
