@@ -4,9 +4,11 @@ A [Python](https://www.python.org) class and utility scripts for scheduling
 and examining [SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
-Runs under Python 2.7, 3.5-3.9, and [pypy](http://pypy.org/)
+Runs under Python 3.6-3.9, and [pypy](http://pypy.org/)
 [Change log](CHANGELOG.md).
 [![Build Status](https://travis-ci.org/acorg/slurm-pipeline.svg?branch=master)](https://travis-ci.org/acorg/slurm-pipeline)
+
+License: [MIT](https://mit-license.org/).
 
 Funding for the original development of this package came from:
 
@@ -860,38 +862,43 @@ collected output will correspond to the order of lines on standard output
 (see also the `remove-repeated-headers.py` helper script mentioned below).
 
 Error output from running the command will be placed in `.out` files in the
-`--outDir` directory.
+`--outDir` directory. These will be numbered with leading zeroes so they
+sort properly (this allows you to `cat` the output files, making the output
+ordering match the input). Use `--digits` to adjust the number of digits if
+the default (currently 5) is not enough.
 
 If not given, an output directory will be created and its path printed.
 
 By default, The jobs are submitted to SLURM using a
 [Job Array](https://slurm.schedmd.com/job_array.html) for efficient
 scehduling of a potentially large number of jobs. This can be disabled with
-the `--noArray` option.
+the `--noArray` option (though see below).
 
 Use `--dryRun` (or `-n`) to have `sbatch.py` write out the files it would
 submit to SLURM (these will be put into the directory specified by
 `--outDir`).
 
-You can additionally specify commands that should be scheduled to run after
+You can optionally specify commands that should be scheduled to run after
 all of standard input is processed, using the `--then` and (for error
 handling) `--else` options, or `--finally` for commands that should be run
-at the end irrespective of the exit status of the initial commands.  This
+at the end, irrespective of the exit status of the initial commands.  This
 is intended to make it easy to do the rough equivalent of a shell command
 line, but the processing starts by (optionally) splitting standard input
-and the downstream commands are run on separate hosts and scheduled by
-SLURM instead of running on the same host with their I/O tied together via
-local UNIX kernel pipelines.
+and the downstream commands are scheduled by SLURM instead of running on
+the same host with their I/O tied together via local UNIX kernel
+pipelines. Your downstream commands can make use of the earlier processing
+because the output files are predictably named and sorted. You can use
+`--prefix` to give output files a unique prefix if necessary.
 
 If standard input starts with a (single) header line (e.g., is a CSV or TSV
-file), use `--header` to tell `sbatch.py` to put a header at the start of
-each input files if multiple jobs are scheduled.
+file), use `--header` to tell `sbatch.py` to put an identical header at the
+start of each input file in the case that multiple jobs are scheduled.
 
 The helper script `remove-repeated-headers.py` can be used to remove
-repeated headers from output files if these each contain a header, allowing
-you to `cat` all output files into `remove-repeated-headers.py` to produce
-a single output file with a single header line (this may of course differ
-from the header in standard input, if any).
+repeated headers from output files if these each contain a header. This
+allows you to `cat` all output files into `remove-repeated-headers.py` to
+produce a single output file with a single header line (this may of course
+differ from the header in standard input, if any).
 
 See `sbatch.py --help` for additional usage options.
 

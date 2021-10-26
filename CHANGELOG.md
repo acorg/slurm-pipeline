@@ -1,3 +1,7 @@
+# Version 4.0.1 - October 26, 2021
+
+Added `LICENSE.txt` for conda forge distribution.
+
 # Version 4.0.0 - October 23, 2021
 
 Removed support for Python 2.7. Added conda building.
