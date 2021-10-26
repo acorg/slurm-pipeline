@@ -1,3 +1,7 @@
+# Version 4.0.4 - October 26, 2021
+
+Moved `test` directory back to top level.
+
 # Version 4.0.3 - October 26, 2021
 
 Moved `test` directory under `slurm_pipeline`.
