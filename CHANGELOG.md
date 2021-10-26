@@ -1,3 +1,7 @@
+# Version 4.0.3 - October 26, 2021
+
+Moved `test` directory under `slurm_pipeline`.
+
 # Version 4.0.2 - October 26, 2021
 
 Use `getpass.getuser()` instead of `pwd.getpwuid(os.getuid()).pw_name` to
