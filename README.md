@@ -848,26 +848,39 @@ shows how you could do that using the `--printFinal` argument to
 <a id="sbatch.py"></a>
 ## sbatch.py
 
-`sbatch.py` allows you to quickly run simple ad hoc SLURM pipelines
-from the command line with no need to for any configuration files. You give
-it a command to run and tell it how many lines of standard input to pass to
-each invocation. This is similar to what you can achieve by running `GNU
-parallel` with the `--pipe` and `-N` arguments, except all the invocations
-take place on compute nodes, as scheduled by SLURM.
+`sbatch.py` allows you to quickly run simple _ad hoc_ SLURM pipelines from
+the command line with no need to for any configuration files. You give it a
+command to run and, optionally, tell it how many lines of standard input to
+pass to each invocation. This is similar to what you can achieve by running
+`GNU parallel` with the `--pipe` and `-N` arguments, except all the
+invocations take place on compute nodes, as scheduled by SLURM.
+
+`sbatch.py` prints a JSON summary of SLURM job ids to standard output
+(unless `--noJobIds` is used). See below for output format details.
 
 Output from each invocation of the command will appear in a file ending in
-`.out` in the directory specified by `--outDir`. These files are numbered
+`.out` in the directory specified by `--dir`. These files are numbered
 with leading zeroes so you can e.g., `cat out/*.out` and the order of the
-collected output will correspond to the order of lines on standard output
-(see also the `remove-repeated-headers.py` helper script mentioned below).
+collected output will correspond to the order of lines on standard
+output. Use `--digits` to adjust the number of digits if the default
+(currently 5) is not enough.  (see also the `remove-repeated-headers.py`
+helper script mentioned below).
 
-Error output from running the command will be placed in `.out` files in the
-`--outDir` directory. These will be numbered with leading zeroes so they
-sort properly (this allows you to `cat` the output files, making the output
-ordering match the input). Use `--digits` to adjust the number of digits if
-the default (currently 5) is not enough.
+Error output from running the command will be placed in `.err` files in the
+`--dir` directory. These will normally be removed if the command exits with
+status zero and the `.err` file is empty.  Use `--keepErrorFiles` to
+unconditionally keep them.
 
-If not given, an output directory will be created and its path printed.
+An input file (or files) ending in `.in` will also be placed in the `--dir`
+directory. These will also be removed once the command completes without
+error. Use `--keepInputs` to unconditionally keep them.
+
+Any output from SLURM that is not a result of running your command will
+appear in `.slurm` files, and these are also normally removed. Use
+`--keepSlurmFiles` to unconditionally keep them.
+
+If `--dir` is not given, a directory will be created (via
+`tempfile.mkdtemp`) and its path printed.
 
 By default, The jobs are submitted to SLURM using a
 [Job Array](https://slurm.schedmd.com/job_array.html) for efficient
@@ -876,7 +889,7 @@ the `--noArray` option (though see below).
 
 Use `--dryRun` (or `-n`) to have `sbatch.py` write out the files it would
 submit to SLURM (these will be put into the directory specified by
-`--outDir`).
+`--dir`).
 
 You can optionally specify commands that should be scheduled to run after
 all of standard input is processed, using the `--then` and (for error
@@ -900,11 +913,65 @@ allows you to `cat` all output files into `remove-repeated-headers.py` to
 produce a single output file with a single header line (this may of course
 differ from the header in standard input, if any).
 
-See `sbatch.py --help` for additional usage options.
+Unless invoked with `--noJobIds`, `sbatch.py` prints a JSON summary of
+SLURM jobs ids, as in the following example:
+
+    {
+      "initial": [
+        4555549,
+        4555550,
+        4555551,
+        4555552
+      ],
+      "then": [
+        4555553,
+        4555554
+      ],
+      "else": [
+        4555555
+      ],
+      "finally": [
+        4555556
+      ],
+      "all": [
+        4555549,
+        4555550,
+        4555551,
+        4555552,
+        4555553,
+        4555554,
+        4555555,
+        4555556
+      ]
+    }
+
+It may be useful to save this output to a file for later use with commands
+such as `sacct`, `squeue`, and `scancel`. This can be very conveniently
+done if you install [jq](https://stedolan.github.io/jq/). For example, if
+you had stored the above into a file called `jobids.json` (and you have a
+POSIX shell, such as bash), you could run one of the following:
+
+```sh
+$ sacct --jobs $(jq '.all | join(",") ' jobids.json | tr -d \")
+$ squeue --jobs $(jq '.all | join(",") ' jobids.json | tr -d \")
+$ scancel $(jq '.all | join(",") ' jobids.json | tr -d \")
+```
+
+Or even
+
+```sh
+$ sbatch.py --afterOk $(jq '.then[-1]' jobids.json) ...
+```
+
+to launch a second command via `sbatch.py`, starting only afer the last of
+the `then` jobs (`4555554` in the above example) completes successfully.
+
+See `sbatch.py --help` for additional usage options (e.g., to specify
+memory, CPUs, job names, time, SLURM partition, etc).
 
 This script has the limitation that the SLURM resources requested for all
-the initial jobs, will also be requested for any `--then`, the `--else`,
-and the `--finally` jobs.
+the initial commands will also be requested for any `--then`, `--else`, or
+`--finally` commands.
 
 ### Example sbatch.py usage
 
@@ -963,23 +1030,23 @@ We can use `sbatch.py` to do the above, but splitting the input into chunks
 and running each chunk via `parallel` on a separate compute node:
 
 ```sh
-$ seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
+$ seq 10000 | sbatch.py --dir out --linesPerJob 1000 \
               "parallel 'seq {} | gzip > /dev/null'"
 ```
 
-Use `--makeDoneFiles` to create empty `.done` files in the output directory
-when jobs finish (successfully).
+Use `--makeDoneFiles` to create empty `.done` files in the `--dir`
+directory when jobs finish (successfully).
 
 Use `--dryRun` (or `-n`) to tell `sbatch.py` not to run `sbatch` but just
 to write out the various files that could later be given to `sbatch`:
 
 ```sh
-$ seq 10000 | sbatch.py --outDir out --linesPerJob 1000 --dryRun \
+$ seq 10000 | sbatch.py --dir out --linesPerJob 1000 --dryRun \
               "parallel 'seq {} | gzip > /dev/null'"
 ```
 
 To see the input files that were used, use `--keepInputs` (then look for
-`.in` files in the `--outDir` directory).
+`.in` files in the `--dir` directory).
 
 Use `--noArray` to create separate `.sbatch` command scripts for each job,
 and `--inline` to use "here" documents in the scripts, to save on making
@@ -998,7 +1065,7 @@ below), and when everything is done, `cat` all the result files, add the
 numbers, and put the sum into a file called `RESULT.`
 
 ```sh
-$ seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
+$ seq 10000 | sbatch.py --dir out --linesPerJob 1000 \
               "parallel 'seq {} | gzip > /dev/null; echo {}'" \
               --then 'cat out/initial*.out | awk "{sum += \$1} END {print sum}" > RESULT'
 $ cat RESULT
@@ -1008,7 +1075,7 @@ $ cat RESULT
 Or add the numbers, send the result into Slack, and then do some clean-up:
 
 ```sh
-seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
+seq 10000 | sbatch.py --dir out --linesPerJob 1000 \
               "parallel 'seq {} | gzip > /dev/null; echo {}'" \
               --then 'cat out/initial*.out | awk "{sum += \$1} END {print sum}" > RESULT' \
               --then "tell-slack.py '$USER, your job has finished (total = $(cat RESULT)).'" \
@@ -1021,7 +1088,7 @@ seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
 Use `--else` for error handling (may be repeated):
 
 ```sh
-seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
+seq 10000 | sbatch.py --dir out --linesPerJob 1000 \
               "parallel 'seq {} | gzip > /dev/null; echo {}'" \
               --then 'cat out/initial*.out | awk "{sum += \$1} END {print sum}" > RESULT' \
               --then "tell-slack.py '$USER, your job has finished (total = $(cat RESULT)).'" \
@@ -1033,7 +1100,7 @@ seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
 Add unconditional final commands via `--finally` (may also be repeated):
 
 ```sh
-$ seq 10000 | sbatch.py --outDir out --linesPerJob 1000 \
+$ seq 10000 | sbatch.py --dir out --linesPerJob 1000 \
               "parallel 'seq {} | gzip > /dev/null; echo {}'" \
               --then 'cat out/initial*.out | awk "{sum += \$1} END {print sum}" > RESULT' \
               --finally 'rm -r out' \

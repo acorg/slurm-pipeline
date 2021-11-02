@@ -1,3 +1,16 @@
+# Version 4.0.6 - November 2, 2021
+
+Added JSON output of all SLURM job numbers and added to README.md to
+describe how to easily use the output with
+[jq](https://stedolan.github.io/jq/) to pass job ids to `sacct`, `squeue`,
+`scancel` or `sbatch.py --afterOk`. Fixed silly bug causing `--then`,
+`--else`, and `--finally` commands not to be wrapped in a script for
+submission to `sbatch`.
+
+# Version 4.0.5 - October 26, 2021
+
+Improved README.
+
 # Version 4.0.4 - October 26, 2021
 
 Moved `test` directory back to top level.

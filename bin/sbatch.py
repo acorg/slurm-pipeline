@@ -8,6 +8,7 @@ from os import environ
 from os.path import exists, join
 from tempfile import mkdtemp
 from time import time, ctime
+from json import dumps
 
 CONDITION_NAMES = {
     'after': 'finally',
@@ -37,7 +38,7 @@ def makeParser():
               'groups of lines and each group will be passed to a separate '
               'invocation of the command. All files related to the running '
               'of the command (input, output, error, SLURM output) will be '
-              'created in the --outDir directory.'))
+              'created in the --dir directory.'))
 
     parser.add_argument(
         '--linesPerJob', '-N', type=int, metavar='N',
@@ -48,7 +49,7 @@ def makeParser():
               'passed to the command.'))
 
     parser.add_argument(
-        '--outDir', metavar='DIR',
+        '--dir', metavar='DIR',
         help=('The directory where command input (if --inline is not used), '
               'output, and error files will be created, along with scripts to '
               'run sbatch (if --dryRun is used) scripts. The directory will '
@@ -58,8 +59,8 @@ def makeParser():
 
     parser.add_argument(
         '--prefix', default='',
-        help=('The prefix to use for input, output, and sbatch files written '
-              'to --outDir.'))
+        help=('The prefix to use for input, output, error, and sbatch files '
+              'written to --dir.'))
 
     parser.add_argument(
         '--afterok', nargs='*',
@@ -82,7 +83,7 @@ def makeParser():
     parser.add_argument(
         '--digits', default=5, metavar='N',
         help=('The number of digits to use in (zero-padded) file names '
-              'written to --outDir.  Only used if --noArray is given.'))
+              'written to --dir.  Only used if --noArray is given.'))
 
     parser.add_argument(
         '--timePerJob', default='10:00',
@@ -152,24 +153,24 @@ def makeParser():
 
     parser.add_argument(
         '--keepErrorFiles', action='store_true',
-        help=('Keep .err files in --outDir when each command run by '
+        help=('Keep .err files in --dir when each command run by '
               'SLURM is completed. These files are otherwise automatically '
               'removed - but only if they are empty.'))
 
     parser.add_argument(
         '--keepSlurmFiles', action='store_true',
-        help=('Keep .slurm files in --outDir when each command run by '
+        help=('Keep .slurm files in --dir when each command run by '
               'SLURM is completed. These files are otherwise automatically '
               'removed - but only if they are empty.'))
 
     parser.add_argument(
         '--makeDoneFiles', action='store_true',
-        help=('Create .done files in --outDir when each command run by '
+        help=('Create .done files in --dir when each command run by '
               'SLURM is successfully completed. If commands do not complete '
               'successfully (exit with status zero), the .done files are '
               'not created, and the standard output and error of the command '
               'will be found in the corresponding .out and .err files in the '
-              '--outDir directory.'))
+              '--dir directory.'))
 
     parser.add_argument(
         '--inline', action='store_true',
@@ -179,7 +180,7 @@ def makeParser():
               'for each invocation of the command, which may help avoid '
               'reaching a filesystem inode quota. If not given, input for '
               'each call to the command is written to a file ending in ".in" '
-              'in the --outDir directory. Note that these input files must be '
+              'in the --dir directory. Note that these input files must be '
               'left in place until SLURM actually runs the jobs. The input '
               'files will be removed when the command completes, unless '
               '--keepInputs is used. This option is ignored unless --noArray '
@@ -194,9 +195,11 @@ def makeParser():
               'commands run using --then, --else, or --finally.'))
 
     parser.add_argument(
-        '--printJobIds', action='store_true',
-        help=('Print the ids (one per line) of any initial jobs submitted to '
-              'SLURM.'))
+        '--noJobIds', action='store_false', dest='printJobIds',
+        help=('Do not print SLURM job ids. Normally, job ids are printed in '
+              'JSON format (you might want to later use a tool like jq (see '
+              'https://stedolan.github.io/jq/) to post-process this output, '
+              'for example to pass job ids to squeue or scancel.'))
 
     return parser
 
@@ -224,7 +227,7 @@ def filePrefix(count, args, condition=None, array=True, slurmHeader=False,
     else:
         suffix = '' if count is None else f'-{count:0{digits}d}'
 
-    return join(args.outDir,
+    return join(args.dir,
                 f'{args.prefix}{CONDITION_NAMES[condition]}{suffix}')
 
 
@@ -483,7 +486,8 @@ def runSbatch(text, args, count=None, header=None, after=None, condition=None,
     @param condition: A C{str} dependency condition to give to sbatch via
         --dependency (see 'man sbatch') (may be C{None} if there are no
         dependencies).
-    @return: A C{str} SLURM job id if a job is submitted, else C{None} (if
+    @raises ValueError: If a the job id in the sbatch output is not numeric.
+    @return: An C{int} SLURM job id if a job is submitted, else C{None} (if
         --dryRun was used).
     """
     if args.dryRun:
@@ -502,7 +506,8 @@ def runSbatch(text, args, count=None, header=None, after=None, condition=None,
     stdout, stderr = proc.communicate(input=text)
 
     if proc.returncode:
-        filename = filePrefix(count, args, condition) + '.sbatch-error'
+        filename = filePrefix(count, args, condition, array=False,
+                              digits=digits) + '.sbatch-error'
 
         with open(filename, 'w') as fp:
             print(text, file=fp)
@@ -519,9 +524,7 @@ def runSbatch(text, args, count=None, header=None, after=None, condition=None,
         sys.exit(proc.returncode)
     else:
         # sbatch prints one line of output, with the job id in the 4th field.
-        # Note that although these are (currently) always integers, we return
-        # a string.
-        return stdout.split()[3]
+        return int(stdout.split()[3])
 
 
 def take(lines, n, header):
@@ -565,13 +568,13 @@ def main(args):
               file=sys.stderr)
         sys.exit(1)
 
-    if args.outDir is None:
-        args.outDir = mkdtemp(prefix='sbatch-stdin')
-        print(f'sbatch files will be stored in {args.outDir!r}.',
+    if args.dir is None:
+        args.dir = mkdtemp(prefix='sbatch-stdin')
+        print(f'sbatch files will be stored in {args.dir!r}.',
               file=sys.stderr)
     else:
-        if not exists(args.outDir):
-            os.makedirs(args.outDir, exist_ok=False)
+        if not exists(args.dir):
+            os.makedirs(args.dir, exist_ok=False)
 
     if args.linesPerJob is None:
         chunks = [sys.stdin]
@@ -581,14 +584,14 @@ def main(args):
         chunks = take(sys.stdin, args.linesPerJob, header)
 
     # Submit the initial jobs.
-    jobIds = []
+    initialJobIds = []
     command = ' '.join(args.command)
     if args.array:
         nFiles = writeInputFiles(chunks, args, header)
         stdin = sbatchTextJobArray(nFiles, command, args, after=args.afterok)
         jobId = runSbatch(stdin, args, header=header, after=args.afterok)
         if jobId:
-            jobIds.append(jobId)
+            initialJobIds.append(jobId)
     else:
         for count, lines in enumerate(chunks):
             stdin = sbatchText(lines, command, count, args, header,
@@ -596,21 +599,28 @@ def main(args):
             jobId = runSbatch(stdin, args, count=count, header=header,
                               after=args.afterok, digits=args.digits)
             if jobId:
-                jobIds.append(jobId)
+                initialJobIds.append(jobId)
 
-    # Submit the '--then' jobs to run after all initial jobs (if they all
-    # succeed).
+    # Submit the '--then' jobs to run (in order) after all initial jobs
+    # (if all initial jobs succeed).
+    pendingJobIds = initialJobIds[:]
+    thenJobIds = []
     for count, command in enumerate(args.then or []):
-        jobId = runSbatch(command, args, count=count, after=jobIds,
-                          condition='afterok')
+        stdin = sbatchText(None, command, count, args, after=pendingJobIds,
+                           condition='afterok')
+        jobId = runSbatch(stdin, args, count=count, after=pendingJobIds,
+                          condition='afterok', digits=args.digits)
         if jobId:
-            jobIds = [jobId]
+            pendingJobIds = [jobId]
+            thenJobIds.append(jobId)
 
     # Submit the '--else' jobs to all run at once if anything fails.
     elseJobIds = []
     for count, command in enumerate(args.else_ or []):
-        jobId = runSbatch(command, args, count=count, after=jobIds,
-                          condition='afternotok')
+        stdin = sbatchText(None, command, count, args, after=pendingJobIds,
+                           condition='afternotok')
+        jobId = runSbatch(stdin, args, count=count, after=pendingJobIds,
+                          condition='afternotok', digits=args.digits)
         if jobId:
             elseJobIds.append(jobId)
 
@@ -618,16 +628,23 @@ def main(args):
     # success or failure of the earlier steps.
     finalJobIds = []
     for count, command in enumerate(args.finally_ or []):
-        jobId = runSbatch(command, args, count=count,
-                          after=jobIds + elseJobIds, condition='after')
+        stdin = sbatchText(None, command, count, args, after=pendingJobIds,
+                           condition='after')
+        jobId = runSbatch(stdin, args, count=count,
+                          after=pendingJobIds + elseJobIds, condition='after',
+                          digits=args.digits)
         if jobId:
             finalJobIds.append(jobId)
 
-    # It's not clear which set of job ids to print. So for now just print
-    # those of the original job(s) (or just the final --then job, if --then
-    # was used).
-    if args.printJobIds and jobIds:
-        print('\n'.join(map(str, sorted(jobIds))))
+    if not args.dryRun and args.printJobIds:
+        print(
+            dumps({
+                'initial': initialJobIds,
+                'then': thenJobIds,
+                'else': elseJobIds,
+                'finally': finalJobIds,
+                'all': initialJobIds + thenJobIds + elseJobIds + finalJobIds,
+            }, indent=2, separators=(', ', ': ')))
 
 
 if __name__ == '__main__':
