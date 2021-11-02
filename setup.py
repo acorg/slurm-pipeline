@@ -52,6 +52,9 @@ setup(name='slurm-pipeline',
             'flake8',
             'pycodestyle',
             'pytest',
+        ],
+        'test': [
+            'pytest',
         ]
       },
       license='MIT',
