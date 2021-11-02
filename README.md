@@ -959,14 +959,12 @@ $ squeue --jobs $(jq '.all | join(",")' jobids.json | tr -d \")
 $ scancel       $(jq '.all | join(",")' jobids.json | tr -d \")
 ```
 
-Or
+Or, to launch a second command via `sbatch.py`, starting only afer the last
+of the `then` jobs (`4555554` in the above example) completes successfully:
 
 ```sh
 $ sbatch.py --afterOk $(jq '.then[-1]' jobids.json) ...
 ```
-
-to launch a second command via `sbatch.py`, starting only afer the last of
-the `then` jobs (`4555554` in the above example) completes successfully.
 
 See `sbatch.py --help` for additional usage options (e.g., to specify
 memory, CPUs, job names, time, SLURM partition, etc).
