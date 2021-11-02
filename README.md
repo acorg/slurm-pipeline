@@ -4,7 +4,7 @@ A [Python](https://www.python.org) class and utility scripts for scheduling
 and examining [SLURM](http://slurm.schedmd.com/)
 ([wikipedia](https://en.wikipedia.org/wiki/Slurm_Workload_Manager)) jobs.
 
-Runs under Python 3.6-3.9, and [pypy](http://pypy.org/)
+Runs under Python 3.6 to 3.10, and [pypy](http://pypy.org/)
 [Change log](CHANGELOG.md).
 [![Build Status](https://travis-ci.org/acorg/slurm-pipeline.svg?branch=master)](https://travis-ci.org/acorg/slurm-pipeline)
 

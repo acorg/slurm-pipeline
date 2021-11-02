@@ -1,3 +1,7 @@
+# Version 4.0.9 - November 2, 2021
+
+Updated `.travis.yml`.
+
 # Version 4.0.8 - November 2, 2021
 
 Added conda install instructions to `README.md`.
