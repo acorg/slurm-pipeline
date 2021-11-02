@@ -21,6 +21,22 @@ Funding for the original development of this package came from:
 
 ## Installation
 
+### From conda
+
+Add the conda-forge channel if you don't have it already (check
+with `conda config --show channels`):
+
+```sh
+$ conda config --add channels conda-forge
+$ conda config --set channel_priority strict
+```
+
+slurm-pipeline can then be installed with:
+
+```sh
+$ conda install slurm-pipeline
+```
+
 ### From PyPI using pip
 
 Using [pip](https://pypi.python.org/pypi/pip):

@@ -1,3 +1,7 @@
+# Version 4.0.8 - November 2, 2021
+
+Added conda install instructions to `README.md`.
+
 # Version 4.0.7 - November 2, 2021
 
 Improved `README.md` description of `sbatch.py`.
