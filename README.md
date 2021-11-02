@@ -863,23 +863,25 @@ Output from each invocation of the command will appear in a file ending in
 with leading zeroes so you can e.g., `cat out/*.out` and the order of the
 collected output will correspond to the order of lines on standard
 output. Use `--digits` to adjust the number of digits if the default
-(currently 5) is not enough.  (see also the `remove-repeated-headers.py`
-helper script mentioned below).
+(currently 5) is not enough.
 
-Error output from running the command will be placed in `.err` files in the
-`--dir` directory. These will normally be removed if the command exits with
-status zero and the `.err` file is empty.  Use `--keepErrorFiles` to
-unconditionally keep them.
+Error output from running the command will be placed in files ending in
+`.err` in the `--dir` directory. These will normally be removed if the
+command exits with status zero and the `.err` file is empty.  Use
+`--keepErrorFiles` to unconditionally keep them.
 
 An input file (or files) ending in `.in` will also be placed in the `--dir`
 directory. These will also be removed once the command completes without
-error. Use `--keepInputs` to unconditionally keep them.
+error. Use `--keepInputs` to unconditionally keep them. See also the
+`--inline` option, below, to avoid making input files (though with a
+caveat).
 
 Any output from SLURM that is not a result of running your command will
-appear in `.slurm` files, and these are also normally removed. Use
-`--keepSlurmFiles` to unconditionally keep them.
+appear in files ending in `.slurm`, which are also removed if no error
+occurs and the file is empty. Use `--keepSlurmFiles` to unconditionally
+keep them.
 
-If `--dir` is not given, a directory will be created (via
+If `--dir` is not specified, a directory will be created (via
 `tempfile.mkdtemp`) and its path printed.
 
 By default, The jobs are submitted to SLURM using a
@@ -952,12 +954,12 @@ you had stored the above into a file called `jobids.json` (and you have a
 POSIX shell, such as bash), you could run one of the following:
 
 ```sh
-$ sacct --jobs $(jq '.all | join(",") ' jobids.json | tr -d \")
-$ squeue --jobs $(jq '.all | join(",") ' jobids.json | tr -d \")
-$ scancel $(jq '.all | join(",") ' jobids.json | tr -d \")
+$ sacct  --jobs $(jq '.all | join(",")'  jobids.json | tr -d \")
+$ squeue --jobs $(jq '.all | join(",")'  jobids.json | tr -d \")
+$ scancel       $(jq '.all | join(",")'  jobids.json | tr -d \")
 ```
 
-Or even
+Or
 
 ```sh
 $ sbatch.py --afterOk $(jq '.then[-1]' jobids.json) ...
