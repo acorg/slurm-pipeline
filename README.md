@@ -900,7 +900,7 @@ keep them.
 If `--dir` is not specified, a directory will be created (via
 `tempfile.mkdtemp`) and its path printed.
 
-By default, The jobs are submitted to SLURM using a
+By default, jobs are submitted to SLURM using a
 [Job Array](https://slurm.schedmd.com/job_array.html) for efficient
 scehduling of a potentially large number of jobs. This can be disabled with
 the `--noArray` option (though see below).
