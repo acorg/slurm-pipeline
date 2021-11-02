@@ -954,9 +954,9 @@ you had stored the above into a file called `jobids.json` (and you have a
 POSIX shell, such as bash), you could run one of the following:
 
 ```sh
-$ sacct  --jobs $(jq '.all | join(",")'  jobids.json | tr -d \")
-$ squeue --jobs $(jq '.all | join(",")'  jobids.json | tr -d \")
-$ scancel       $(jq '.all | join(",")'  jobids.json | tr -d \")
+$ sacct  --jobs $(jq '.all | join(",")' jobids.json | tr -d \")
+$ squeue --jobs $(jq '.all | join(",")' jobids.json | tr -d \")
+$ scancel       $(jq '.all | join(",")' jobids.json | tr -d \")
 ```
 
 Or
