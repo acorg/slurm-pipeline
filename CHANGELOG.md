@@ -1,6 +1,6 @@
 # Version 4.0.9 - November 2, 2021
 
-Updated `.travis.yml`.
+Updated `.travis.yml` and build status image URL on `README.md`.
 
 # Version 4.0.8 - November 2, 2021
 

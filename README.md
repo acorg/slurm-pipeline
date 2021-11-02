@@ -6,7 +6,7 @@ and examining [SLURM](http://slurm.schedmd.com/)
 
 Runs under Python 3.6 to 3.10, and [pypy](http://pypy.org/)
 [Change log](CHANGELOG.md).
-[![Build Status](https://travis-ci.org/acorg/slurm-pipeline.svg?branch=master)](https://travis-ci.org/acorg/slurm-pipeline)
+[![Build Status](https://app.travis-ci.com/acorg/slurm-pipeline.svg?branch=master)](https://app.travis-ci.com/acorg/slurm-pipeline)
 
 License: [MIT](https://mit-license.org/).
 
