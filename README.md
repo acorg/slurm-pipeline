@@ -906,8 +906,8 @@ scehduling of a potentially large number of jobs. This can be disabled with
 the `--noArray` option (though see below).
 
 Use `--dryRun` (or `-n`) to have `sbatch.py` write out the files it would
-submit to SLURM (these will be put into the directory specified by
-`--dir`).
+submit to SLURM via `sbatch` (these will be put into the directory
+specified by `--dir`, each with a `.sbatch` suffix).
 
 You can optionally specify commands that should be scheduled to run after
 all of standard input is processed, using the `--then` and (for error
