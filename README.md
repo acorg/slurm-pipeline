@@ -886,10 +886,11 @@ Error output from running the command will be placed in files ending in
 command exits with status zero and the `.err` file is empty.  Use
 `--keepErrorFiles` to unconditionally keep them.
 
-An input file (or files) ending in `.in` will also be placed in the `--dir`
-directory. These will also be removed once the command completes without
-error. Use `--keepInputs` to unconditionally keep them. See also the
-`--inline` option, below, to avoid making input files (though with a
+An input file (or files) ending in `.in.bz2` will also be placed in the
+`--dir` directory. These will also be removed once the command completes
+without error. Use `--keepInputs` to unconditionally keep them. Use
+`--uncompressed` to generate input files that are not compressed.  See also
+the `--inline` option, below, to avoid making input files (though with a
 caveat).
 
 Any output from SLURM that is not a result of running your command will
@@ -907,7 +908,10 @@ the `--noArray` option (though see below).
 
 Use `--dryRun` (or `-n`) to have `sbatch.py` write out the files it would
 submit to SLURM via `sbatch` (these will be put into the directory
-specified by `--dir`, each with a `.sbatch` suffix).
+specified by `--dir`, each with a `.sbatch` suffix). If you like what you
+see, you can then submit the job to SLURM, via `sbatch dir/initial.sbatch`
+(where `dir` is the value you gave to the `--dir` option, or the temporary
+directory `sbatch.py` makes for you if you don't specify one).
 
 You can optionally specify commands that should be scheduled to run after
 all of standard input is processed, using the `--then` and (for error
@@ -1061,8 +1065,9 @@ $ seq 10000 | sbatch.py --dir out --linesPerJob 1000 --dryRun \
               "parallel 'seq {} | gzip > /dev/null'"
 ```
 
-To see the input files that were used, use `--keepInputs` (then look for
-`.in` files in the `--dir` directory).
+To see the input files that were used, use `--keepInputs`, then you'll find
+`.in.bz2` files in the `--dir` directory (with no `.bz2` suffix if you use
+`--uncompressed`).
 
 Use `--noArray` to create separate `.sbatch` command scripts for each job,
 and `--inline` to use "here" documents in the scripts, to save on making

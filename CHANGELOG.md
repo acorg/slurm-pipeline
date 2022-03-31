@@ -1,3 +1,9 @@
+# Version 4.0.10 - March 31, 2022
+
+Added compression of input files to `sbatch.py` and an `--uncompress`
+option to turn this off. Thanks to
+[@holtgrewe](https://github.com/holtgrewe) for this suggestion.
+
 # Version 4.0.9 - November 2, 2021
 
 Updated `.travis.yml` and build status image URL on `README.md`.

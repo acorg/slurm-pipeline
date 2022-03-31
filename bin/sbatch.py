@@ -4,6 +4,7 @@ import sys
 import argparse
 import subprocess
 import os
+import bz2
 from os import environ
 from os.path import exists, join
 from tempfile import mkdtemp
@@ -201,6 +202,10 @@ def makeParser():
               'https://stedolan.github.io/jq/) to post-process this output, '
               'for example to pass job ids to squeue or scancel.'))
 
+    parser.add_argument(
+        '--uncompressed', action='store_true',
+        help='Do not compress input files.')
+
     return parser
 
 
@@ -255,8 +260,13 @@ def writeInputFiles(chunks, args, header=None):
     for count, lines in enumerate(chunks, start=1):
         prefix = filePrefix(count, args, array=False)
         stdin = (header or '') + (''.join(lines) if lines else '')
-        with open(f'{prefix}.in', 'w') as fp:
-            print(stdin, end='', file=fp)
+
+        if args.uncompressed:
+            with open(prefix + '.in', 'w') as fp:
+                fp.write(stdin)
+        else:
+            with bz2.open(prefix + '.in.bz2', 'wb') as fp:
+                fp.write(stdin.encode('utf-8'))
 
     return count
 
@@ -280,7 +290,13 @@ def sbatchTextJobArray(nJobs, command, args, after=None, condition=None):
     prefix = filePrefix(None, args, condition)
     prefixNoZeroes = filePrefix(None, args, condition, digits=0)
     headerPrefix = filePrefix(None, args, condition, slurmHeader=True)
-    in_ = f'{prefixNoZeroes}.in'
+    if args.uncompressed:
+        inputFile = f'{prefixNoZeroes}.in'
+        in_ = f'< "{inputFile}"'
+    else:
+        inputFile = f'{prefixNoZeroes}.in.bz2'
+        # There can be no space between the < and the ( in the following.
+        in_ = f'<(bzcat "{inputFile}")'
     out = f'{prefix}.out'
     err = f'{prefix}.err'
     slurmOutHeader = f'{headerPrefix}.slurm'
@@ -301,7 +317,7 @@ def sbatchTextJobArray(nJobs, command, args, after=None, condition=None):
     else:
         dependencies = ''
 
-    removeInput = f'rm "{in_}"' if args.removeInputs else ''
+    removeInput = f'rm "{inputFile}"' if args.removeInputs else ''
 
     arrayMax = f'%{args.arrayMax}' if args.arrayMax is not None else ''
 
@@ -336,7 +352,7 @@ err_=$(echo "{err}" | sed -e "s/-$SLURM_ARRAY_TASK_ID\\.err\\$/-$count_.err/")
 
 exec > "$out_" 2> "$err_"
 
-{command} < "{in_}"
+{command} {in_}
 
 {touchDone}
 {removeInput}
