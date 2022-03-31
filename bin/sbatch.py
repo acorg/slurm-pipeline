@@ -10,6 +10,7 @@ from os.path import exists, join
 from tempfile import mkdtemp
 from time import time, ctime
 from json import dumps
+from random import uniform
 
 CONDITION_NAMES = {
     'after': 'finally',
@@ -206,6 +207,22 @@ def makeParser():
         '--uncompressed', action='store_true',
         help='Do not compress input files.')
 
+    parser.add_argument(
+        '--randomSleep', type=int, metavar='SECONDS',
+        help=('If given, SLURM jobs will sleep for a random number of seconds '
+              '(after being launched by SLURM) before starting to process '
+              'their input. This can be used to avoid overwhelming the I/O '
+              'system on a cluster if many jobs are simultaneously trying to '
+              'read their input. The sleep time will be a uniform value from '
+              '1 to the given value.'))
+
+    parser.add_argument(
+        '--compressLevel', type=int, metavar='N', choices=list(range(1, 10)),
+        default=9,
+        help=('The bzip2 compression level for compressing input files. 1 is '
+              'lowest (fastest) and 9 is highest (slowest). See man bzip2 for '
+              'details. Ignored if --uncompressed is used.'))
+
     return parser
 
 
@@ -265,7 +282,8 @@ def writeInputFiles(chunks, args, header=None):
             with open(prefix + '.in', 'w') as fp:
                 fp.write(stdin)
         else:
-            with bz2.open(prefix + '.in.bz2', 'wb') as fp:
+            with bz2.open(prefix + '.in.bz2', 'wb',
+                          compresslevel=args.compressLevel) as fp:
                 fp.write(stdin.encode('utf-8'))
 
     return count
@@ -292,11 +310,11 @@ def sbatchTextJobArray(nJobs, command, args, after=None, condition=None):
     headerPrefix = filePrefix(None, args, condition, slurmHeader=True)
     if args.uncompressed:
         inputFile = f'{prefixNoZeroes}.in'
-        in_ = f'< "{inputFile}"'
+        input_ = f'< "{inputFile}"'
     else:
         inputFile = f'{prefixNoZeroes}.in.bz2'
         # There can be no space between the < and the ( in the following.
-        in_ = f'<(bzcat "{inputFile}")'
+        input_ = f'<(bzcat "{inputFile}")'
     out = f'{prefix}.out'
     err = f'{prefix}.err'
     slurmOutHeader = f'{headerPrefix}.slurm'
@@ -316,6 +334,10 @@ def sbatchTextJobArray(nJobs, command, args, after=None, condition=None):
             f'{condition or "afterok"}:' + ':'.join(map(str, after)))
     else:
         dependencies = ''
+
+    # Each job in the array must compute its own sleep time.
+    sleep = (f'sleep $(( 1 + RANDOM % {args.randomSleep} ))'
+             if args.randomSleep else '')
 
     removeInput = f'rm "{inputFile}"' if args.removeInputs else ''
 
@@ -344,6 +366,8 @@ set -Eeuo pipefail
 # {creationInfo()}
 {dependencies}
 
+{sleep}
+
 count_=$(printf '%*d' {args.digits} $SLURM_ARRAY_TASK_ID | tr ' ' 0)
 out_=$(echo "{out}" | sed -e "s/-$SLURM_ARRAY_TASK_ID\\.out\\$/-$count_.out/")
 err_=$(echo "{err}" | sed -e "s/-$SLURM_ARRAY_TASK_ID\\.err\\$/-$count_.err/")
@@ -352,7 +376,7 @@ err_=$(echo "{err}" | sed -e "s/-$SLURM_ARRAY_TASK_ID\\.err\\$/-$count_.err/")
 
 exec > "$out_" 2> "$err_"
 
-{command} {in_}
+{command} {input_}
 
 {touchDone}
 {removeInput}
@@ -406,6 +430,9 @@ def sbatchText(lines, command, count, args, header=None, after=None,
     else:
         dependencies = ''
 
+    sleep = (f'sleep $(( 1 + RANDOM % {args.randomSleep} ))'
+             if args.randomSleep else '')
+
     removeInput = ''
 
     if stdin:
@@ -416,12 +443,23 @@ def sbatchText(lines, command, count, args, header=None, after=None,
             nl = '' if stdin.endswith('\n') else '\n'
             input_ = f'<<{delim!r}\n{stdin}{nl}{delim}'
         else:
-            in_ = f'{prefix}.in'
-            with open(in_, 'w') as fp:
-                print(stdin, end='', file=fp)
-            input_ = f'< {in_!r}'
+
+            if args.uncompressed:
+                inputFile = f'{prefix}.in'
+                input_ = f'< {inputFile!r}'
+                with open(inputFile, 'w') as fp:
+                    fp.write(stdin)
+            else:
+                inputFile = f'{prefix}.in.bz2'
+                # There can be no space between the < and the ( in the
+                # following.
+                input_ = f'<(bzcat {inputFile!r})'
+                with bz2.open(inputFile, 'wb',
+                              compresslevel=args.compressLevel) as fp:
+                    fp.write(stdin.encode('utf-8'))
+
             if args.removeInputs:
-                removeInput = f'rm {in_!r}'
+                removeInput = f'rm {inputFile!r}'
     else:
         input_ = ''
 
@@ -446,6 +484,8 @@ set -Eeuo pipefail
 
 # {creationInfo()}
 {dependencies}
+
+{sleep}
 
 {rmDone}
 

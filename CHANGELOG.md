@@ -1,3 +1,7 @@
+# Version 4.0.11 - April 1, 2022
+
+Added `--compressLevel` and `--randomSleep` options to `sbatch.py`.
+
 # Version 4.0.10 - March 31, 2022
 
 Added compression of input files to `sbatch.py` and an `--uncompress`
