@@ -223,6 +223,10 @@ def makeParser():
               'lowest (fastest) and 9 is highest (slowest). See man bzip2 for '
               'details. Ignored if --uncompressed is used.'))
 
+    parser.add_argument(
+        '--verbose', '-v', action='store_true',
+        help='Report progress on making input files.')
+
     return parser
 
 
@@ -279,12 +283,20 @@ def writeInputFiles(chunks, args, header=None):
         stdin = (header or '') + (''.join(lines) if lines else '')
 
         if args.uncompressed:
-            with open(prefix + '.in', 'w') as fp:
+            filename = prefix + '.in'
+            detail = f'({len(lines)} lines)'
+            with open(filename, 'w') as fp:
                 fp.write(stdin)
         else:
-            with bz2.open(prefix + '.in.bz2', 'wb',
+            filename = prefix + '.in.bz2'
+            data = stdin.encode('utf-8')
+            detail = f'({len(data)} bytes)'
+            with bz2.open(filename, 'wb',
                           compresslevel=args.compressLevel) as fp:
-                fp.write(stdin.encode('utf-8'))
+                fp.write(data)
+
+        if args.verbose:
+            print(f'Wrote input file {filename!r} {detail}.', file=sys.stderr)
 
     return count
 

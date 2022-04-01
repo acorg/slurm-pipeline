@@ -1,3 +1,7 @@
+# Version 4.0.12 - April 1, 2022
+
+Added `--verbose` option to `sbatch.py`.
+
 # Version 4.0.11 - April 1, 2022
 
 Added `--compressLevel` and `--randomSleep` options to `sbatch.py`.
