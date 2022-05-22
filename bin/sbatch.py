@@ -10,7 +10,6 @@ from os.path import exists, join
 from tempfile import mkdtemp
 from time import time, ctime
 from json import dumps
-from random import uniform
 
 CONDITION_NAMES = {
     'after': 'finally',
@@ -281,22 +280,25 @@ def writeInputFiles(chunks, args, header=None):
     for count, lines in enumerate(chunks, start=1):
         prefix = filePrefix(count, args, array=False)
         stdin = (header or '') + (''.join(lines) if lines else '')
+        start = time()
 
         if args.uncompressed:
             filename = prefix + '.in'
-            detail = f'({len(lines)} lines)'
+            detail = f'{len(stdin):,} chars'
             with open(filename, 'w') as fp:
                 fp.write(stdin)
         else:
             filename = prefix + '.in.bz2'
             data = stdin.encode('utf-8')
-            detail = f'({len(data)} bytes)'
+            detail = f'{len(data):,} bytes'
             with bz2.open(filename, 'wb',
                           compresslevel=args.compressLevel) as fp:
                 fp.write(data)
 
         if args.verbose:
-            print(f'Wrote input file {filename!r} {detail}.', file=sys.stderr)
+            print(f'Wrote input file {filename!r} ({len(lines):,} lines, '
+                  f'{detail}, in {time() - start:.2f} seconds).',
+                  file=sys.stderr)
 
     return count
 
@@ -326,7 +328,7 @@ def sbatchTextJobArray(nJobs, command, args, after=None, condition=None):
     else:
         inputFile = f'{prefixNoZeroes}.in.bz2'
         # There can be no space between the < and the ( in the following.
-        input_ = f'<(bzcat "{inputFile}")'
+        input_ = f'< <(bzcat "{inputFile}")'
     out = f'{prefix}.out'
     err = f'{prefix}.err'
     slurmOutHeader = f'{headerPrefix}.slurm'
@@ -394,7 +396,6 @@ exec > "$out_" 2> "$err_"
 {removeInput}
 {removeErrors}
 {removeSlurm}
-
 ''')
 
 
@@ -465,7 +466,7 @@ def sbatchText(lines, command, count, args, header=None, after=None,
                 inputFile = f'{prefix}.in.bz2'
                 # There can be no space between the < and the ( in the
                 # following.
-                input_ = f'<(bzcat {inputFile!r})'
+                input_ = f'< <(bzcat {inputFile!r})'
                 with bz2.open(inputFile, 'wb',
                               compresslevel=args.compressLevel) as fp:
                     fp.write(stdin.encode('utf-8'))

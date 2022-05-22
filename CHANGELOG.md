@@ -1,3 +1,8 @@
+# Version 4.0.13 - May 22, 2022
+
+Added missing `<` in command line providing input from `*.bz2` files to the
+command being executed by `sbatch.py`.
+
 # Version 4.0.12 - April 1, 2022
 
 Added `--verbose` option to `sbatch.py`.
