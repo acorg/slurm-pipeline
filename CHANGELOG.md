@@ -1,3 +1,8 @@
+# Version 4.0.14 - Dec 11, 2023
+
+Make loading the JSON specification file give a better error message,
+including the specification filename.
+
 # Version 4.0.13 - May 22, 2022
 
 Added missing `<` in command line providing input from `*.bz2` files to the

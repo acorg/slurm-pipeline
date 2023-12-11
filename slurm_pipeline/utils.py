@@ -11,5 +11,5 @@ def secondsToTime(seconds, sacctCompatible=False):
     @return: A C{str} giving the date/time corresponding to C{seconds}.
     """
     return strftime(
-        '%Y-%m-%d' + ('T' if sacctCompatible else ' ') + '%H:%M:%S',
-        gmtime(seconds))
+        "%Y-%m-%d" + ("T" if sacctCompatible else " ") + "%H:%M:%S", gmtime(seconds)
+    )

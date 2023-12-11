@@ -16,9 +16,10 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         sacct. If C{None}, a default set will be used (determined by sacct.py).
         See man sacct for the full list of possible field names.
     """
+
     def __init__(self, specification, fieldNames=None):
         SlurmPipelineBase.__init__(self, specification)
-        jobIds = self.jobs() | set(self.specification['startAfter'] or ())
+        jobIds = self.jobs() | set(self.specification["startAfter"] or ())
         self.sacct = SAcct(jobIds, fieldNames=fieldNames)
 
     @staticmethod
@@ -30,9 +31,10 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         @raise SpecificationError: if there is anything wrong with the
             specification.
         """
-        if 'scheduledAt' not in specification:
+        if "scheduledAt" not in specification:
             raise SpecificationError(
-                "The specification status has no top-level 'scheduledAt' key")
+                "The specification status has no top-level 'scheduledAt' key"
+            )
 
         SlurmPipelineBase.checkSpecification(specification)
 
@@ -42,10 +44,10 @@ class SlurmPipelineStatus(SlurmPipelineBase):
 
         @return: A C{set} of C{int} job ids.
         """
-        steps = self.specification['steps']
+        steps = self.specification["steps"]
         result = set()
         for stepName in self.finalSteps():
-            for jobIds in steps[stepName]['tasks'].values():
+            for jobIds in steps[stepName]["tasks"].values():
                 result.update(jobIds)
         return result
 
@@ -57,9 +59,10 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         """
         finished = self.sacct.finished
         result = set()
-        for stepName in self.specification['steps']:
-            result.update([jobid for jobid in self.stepJobIds(stepName)
-                           if finished(jobid)])
+        for stepName in self.specification["steps"]:
+            result.update(
+                [jobid for jobid in self.stepJobIds(stepName) if finished(jobid)]
+            )
         return result
 
     def unfinishedJobs(self):
@@ -70,9 +73,10 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         """
         finished = self.sacct.finished
         result = set()
-        for stepName in self.specification['steps']:
-            result.update([jobid for jobid in self.stepJobIds(stepName)
-                           if not finished(jobid)])
+        for stepName in self.specification["steps"]:
+            result.update(
+                [jobid for jobid in self.stepJobIds(stepName) if not finished(jobid)]
+            )
         return result
 
     def jobs(self):
@@ -82,7 +86,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         @return: A C{set} of C{int} job ids.
         """
         result = set()
-        for stepName in self.specification['steps']:
+        for stepName in self.specification["steps"]:
             jobIds = self.stepJobIds(stepName)
             result.update(jobIds)
         return result
@@ -94,9 +98,9 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         @param stepName: The C{str} name of a step.
         @return: A C{set} of C{int} job ids that a step is dependent on.
         """
-        step = self.specification['steps'][stepName]
+        step = self.specification["steps"][stepName]
         jobIds = set()
-        for taskJobIds in step['taskDependencies'].values():
+        for taskJobIds in step["taskDependencies"].values():
             jobIds.update(taskJobIds)
         return jobIds
 
@@ -108,8 +112,8 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         @return: A C{set} of C{int} emitted job ids for the step.
         """
         jobIds = set()
-        step = self.specification['steps'][stepName]
-        for taskJobIds in step['tasks'].values():
+        step = self.specification["steps"][stepName]
+        for taskJobIds in step["tasks"].values():
             jobIds.update(taskJobIds)
         return jobIds
 
@@ -122,112 +126,137 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         """
         result = []
         append = result.append
-        step = self.specification['steps'][stepName]
+        step = self.specification["steps"][stepName]
 
         # Summarize step dependencies, if any.
         try:
-            dependencyCount = len(step['dependencies'])
+            dependencyCount = len(step["dependencies"])
         except KeyError:
             dependencyCount = 0
 
         if dependencyCount:
             append(
-                '  %d step %s: %s' %
-                (dependencyCount,
-                 'dependency' if dependencyCount == 1 else 'dependencies',
-                 ', '.join(step['dependencies'])))
+                "  %d step %s: %s"
+                % (
+                    dependencyCount,
+                    "dependency" if dependencyCount == 1 else "dependencies",
+                    ", ".join(step["dependencies"]),
+                )
+            )
 
-            taskDependencyCount = len(step['taskDependencies'])
+            taskDependencyCount = len(step["taskDependencies"])
 
             jobIds = self.stepDependentJobIds(stepName)
             jobIdsCount = len(jobIds)
-            jobIdsFinished = [jobId for jobId in jobIds
-                              if self.sacct.finished(jobId)]
+            jobIdsFinished = [jobId for jobId in jobIds if self.sacct.finished(jobId)]
             jobIdsFinishedCount = len(jobIdsFinished)
 
             append(
-                '    Dependent on %d task%s emitted by the dependent '
-                'step%s' %
-                (taskDependencyCount,
-                 '' if taskDependencyCount == 1 else 's',
-                 '' if dependencyCount == 1 else 's'))
+                "    Dependent on %d task%s emitted by the dependent "
+                "step%s"
+                % (
+                    taskDependencyCount,
+                    "" if taskDependencyCount == 1 else "s",
+                    "" if dependencyCount == 1 else "s",
+                )
+            )
 
             if jobIdsCount:
                 append(
-                    '    Summary: %d job%s started by the dependent task%s, '
-                    'of which %d (%.2f%%) are finished' %
-                    (jobIdsCount, '' if jobIdsCount == 1 else 's',
-                     '' if dependencyCount == 1 else 's',
-                     jobIdsFinishedCount,
-                     100.0 if jobIdsCount == 0 else
-                     (jobIdsFinishedCount / jobIdsCount * 100.0)))
+                    "    Summary: %d job%s started by the dependent task%s, "
+                    "of which %d (%.2f%%) are finished"
+                    % (
+                        jobIdsCount,
+                        "" if jobIdsCount == 1 else "s",
+                        "" if dependencyCount == 1 else "s",
+                        jobIdsFinishedCount,
+                        100.0
+                        if jobIdsCount == 0
+                        else (jobIdsFinishedCount / jobIdsCount * 100.0),
+                    )
+                )
             elif taskDependencyCount:
-                append('    Summary: 0 jobs started by the dependent '
-                       'task%s' % ('' if taskDependencyCount == 1 else 's'))
+                append(
+                    "    Summary: 0 jobs started by the dependent "
+                    "task%s" % ("" if taskDependencyCount == 1 else "s")
+                )
 
             if taskDependencyCount:
-                append('    Dependent tasks:')
-                for taskName in sorted(step['taskDependencies']):
-                    jobIds = step['taskDependencies'][taskName]
-                    append('      %s' % taskName)
+                append("    Dependent tasks:")
+                for taskName in sorted(step["taskDependencies"]):
+                    jobIds = step["taskDependencies"][taskName]
+                    append("      %s" % taskName)
                     for jobId in sorted(jobIds):
-                        append('        Job %d: %s' %
-                               (jobId, self.sacct.summarize(jobId)))
+                        append(
+                            "        Job %d: %s" % (jobId, self.sacct.summarize(jobId))
+                        )
         else:
-            assert len(step['taskDependencies']) == 0
-            append('  No dependencies.')
+            assert len(step["taskDependencies"]) == 0
+            append("  No dependencies.")
 
         # Summarize tasks launched by this step, if any.
-        taskCount = len(step['tasks'])
+        taskCount = len(step["tasks"])
 
         if taskCount:
             append(
-                '  %d task%s emitted by this step' %
-                (taskCount, '' if taskCount == 1 else 's'))
+                "  %d task%s emitted by this step"
+                % (taskCount, "" if taskCount == 1 else "s")
+            )
 
             jobIds = self.stepJobIds(stepName)
             jobIdsCount = len(jobIds)
-            jobIdsFinishedCount = [jobId for jobId in jobIds
-                                   if self.sacct.finished(jobId)]
+            jobIdsFinishedCount = [
+                jobId for jobId in jobIds if self.sacct.finished(jobId)
+            ]
             jobIdsFinishedCount = len(jobIdsFinishedCount)
 
             if jobIdsCount:
                 append(
-                    '    Summary: %d job%s started by %s, of which %d '
-                    '(%.2f%%) are finished' %
-                    (jobIdsCount, '' if jobIdsCount == 1 else 's',
-                     'this task' if taskCount == 1 else 'these tasks',
-                     jobIdsFinishedCount,
-                     100.0 if jobIdsCount == 0 else
-                     jobIdsFinishedCount / jobIdsCount * 100.0))
+                    "    Summary: %d job%s started by %s, of which %d "
+                    "(%.2f%%) are finished"
+                    % (
+                        jobIdsCount,
+                        "" if jobIdsCount == 1 else "s",
+                        "this task" if taskCount == 1 else "these tasks",
+                        jobIdsFinishedCount,
+                        100.0
+                        if jobIdsCount == 0
+                        else jobIdsFinishedCount / jobIdsCount * 100.0,
+                    )
+                )
             else:
-                append('    Summary: 0 jobs started by %s' %
-                       ('this task' if taskCount == 1 else 'these tasks'))
+                append(
+                    "    Summary: 0 jobs started by %s"
+                    % ("this task" if taskCount == 1 else "these tasks")
+                )
 
             if taskCount:
-                append('    Tasks:')
-                for taskName in sorted(step['tasks']):
-                    jobIds = step['tasks'][taskName]
-                    append('      %s' % taskName)
+                append("    Tasks:")
+                for taskName in sorted(step["tasks"]):
+                    jobIds = step["tasks"][taskName]
+                    append("      %s" % taskName)
                     for jobId in sorted(jobIds):
-                        append('        Job %d: %s' %
-                               (jobId, self.sacct.summarize(jobId)))
+                        append(
+                            "        Job %d: %s" % (jobId, self.sacct.summarize(jobId))
+                        )
         else:
-            assert len(step['tasks']) == 0
-            append('  No tasks emitted by this step')
+            assert len(step["tasks"]) == 0
+            append("  No tasks emitted by this step")
 
-        result.extend([
-            '  Collect step: %s' % step.get('collect', 'False'),
-            '  Error step: %s' % step.get('error step', 'False'),
-            '  Working directory: %s' % step.get('cwd', '.'),
-            '  Scheduled at: %s' % secondsToTime(step['scheduledAt']),
-            '  Script: %s' % step['script'],
-            '  Skip: %s' % step['skip'],
-        ])
+        result.extend(
+            [
+                "  Collect step: %s" % step.get("collect", "False"),
+                "  Error step: %s" % step.get("error step", "False"),
+                "  Working directory: %s" % step.get("cwd", "."),
+                "  Scheduled at: %s" % secondsToTime(step["scheduledAt"]),
+                "  Script: %s" % step["script"],
+                "  Skip: %s" % step["skip"],
+            ]
+        )
 
-        append('  Slurm pipeline environment variables:')
-        for var in sorted(step['environ']):
-            append('    %s: %s' % (var, step['environ'][var]))
+        append("  Slurm pipeline environment variables:")
+        for var in sorted(step["environ"]):
+            append("    %s: %s" % (var, step["environ"][var]))
 
         return result
 
@@ -239,37 +268,49 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         """
         summary = []
         append = summary.append
-        steps = self.specification['steps']
+        steps = self.specification["steps"]
         totalJobIdsEmitted = totalJobIdsFinished = 0
 
         for stepName in steps:
             jobIdsEmitted = self.stepJobIds(stepName)
             jobIdsEmittedCount = len(jobIdsEmitted)
-            jobIdsFinished = [jobId for jobId in jobIdsEmitted
-                              if self.sacct.finished(jobId)]
+            jobIdsFinished = [
+                jobId for jobId in jobIdsEmitted if self.sacct.finished(jobId)
+            ]
             jobIdsFinishedCount = len(jobIdsFinished)
             totalJobIdsEmitted += jobIdsEmittedCount
             totalJobIdsFinished += jobIdsFinishedCount
 
             if jobIdsEmittedCount:
-                percent = (0.0 if jobIdsEmittedCount == 0 else
-                           jobIdsFinishedCount / jobIdsEmittedCount * 100.0)
+                percent = (
+                    0.0
+                    if jobIdsEmittedCount == 0
+                    else jobIdsFinishedCount / jobIdsEmittedCount * 100.0
+                )
                 append(
-                    '    %s: %d job%s emitted, %d (%.2f%%) finished' %
-                    (stepName, jobIdsEmittedCount,
-                     '' if jobIdsEmittedCount == 1 else 's',
-                     jobIdsFinishedCount, percent))
+                    "    %s: %d job%s emitted, %d (%.2f%%) finished"
+                    % (
+                        stepName,
+                        jobIdsEmittedCount,
+                        "" if jobIdsEmittedCount == 1 else "s",
+                        jobIdsFinishedCount,
+                        percent,
+                    )
+                )
             else:
-                append('    %s: no jobs emitted' % stepName)
+                append("    %s: no jobs emitted" % stepName)
 
-        percent = (100.0 if totalJobIdsEmitted == 0 else
-                   totalJobIdsFinished / totalJobIdsEmitted * 100.0)
+        percent = (
+            100.0
+            if totalJobIdsEmitted == 0
+            else totalJobIdsFinished / totalJobIdsEmitted * 100.0
+        )
 
         return [
-            'Steps summary:',
-            '  Number of steps: %d' % len(steps),
-            '  Jobs emitted in total: %d' % totalJobIdsEmitted,
-            '  Jobs finished: %d (%.2f%%)' % (totalJobIdsFinished, percent),
+            "Steps summary:",
+            "  Number of steps: %d" % len(steps),
+            "  Jobs emitted in total: %d" % totalJobIdsEmitted,
+            "  Jobs finished: %d (%.2f%%)" % (totalJobIdsFinished, percent),
         ] + summary
 
     def toStr(self):
@@ -284,53 +325,59 @@ class SlurmPipelineStatus(SlurmPipelineBase):
         # we're run on a status file created before the username was being
         # stored (added in 2.0.0).
         result = [
-            'Scheduled by: %s' % specification.get('user', 'UNKNOWN'),
-            'Scheduled at: %s' % secondsToTime(specification['scheduledAt']),
-            'Scheduling arguments:',
-            '  First step: %s' % specification['firstStep'],
-            '  Force: %s' % specification['force'],
-            '  Last step: %s' % specification['lastStep'],
+            "Scheduled by: %s" % specification.get("user", "UNKNOWN"),
+            "Scheduled at: %s" % secondsToTime(specification["scheduledAt"]),
+            "Scheduling arguments:",
+            "  First step: %s" % specification["firstStep"],
+            "  Force: %s" % specification["force"],
+            "  Last step: %s" % specification["lastStep"],
         ]
         append = result.append
 
-        append('  Nice: %s' % specification.get('nice', '<None>'))
-        append('  Sleep: %.2f' % specification.get('sleep', 0.0))
+        append("  Nice: %s" % specification.get("nice", "<None>"))
+        append("  Sleep: %.2f" % specification.get("sleep", 0.0))
 
-        if specification['scriptArgs']:
-            append('  Script arguments: %s' %
-                   ' '.join(specification['scriptArgs']))
+        if specification["scriptArgs"]:
+            append("  Script arguments: %s" % " ".join(specification["scriptArgs"]))
         else:
-            append('  Script arguments: <None>')
+            append("  Script arguments: <None>")
 
-        if specification['skip']:
-            append('  Skip: %s' % ', '.join(specification['skip']))
+        if specification["skip"]:
+            append("  Skip: %s" % ", ".join(specification["skip"]))
         else:
-            append('  Skip: <None>')
+            append("  Skip: <None>")
 
-        if specification['startAfter']:
-            startAfter = specification['startAfter']
+        if specification["startAfter"]:
+            startAfter = specification["startAfter"]
             nStartAfter = len(startAfter)
-            finishedCount = len([
-                jobId for jobId in startAfter if self.sacct.finished(jobId)])
+            finishedCount = len(
+                [jobId for jobId in startAfter if self.sacct.finished(jobId)]
+            )
             percent = finishedCount / nStartAfter * 100.0
 
             append(
-                '  Start after the following %d job%s, of which %d (%.2f%%) '
-                '%s finished:' %
-                (nStartAfter, '' if nStartAfter == 1 else 's', finishedCount,
-                 percent, 'is' if finishedCount == 1 else 'are'))
+                "  Start after the following %d job%s, of which %d (%.2f%%) "
+                "%s finished:"
+                % (
+                    nStartAfter,
+                    "" if nStartAfter == 1 else "s",
+                    finishedCount,
+                    percent,
+                    "is" if finishedCount == 1 else "are",
+                )
+            )
             for jobId in startAfter:
-                append('    Job %d: %s' % (jobId, self.sacct.summarize(jobId)))
+                append("    Job %d: %s" % (jobId, self.sacct.summarize(jobId)))
         else:
-            append('  Start after: <None>')
+            append("  Start after: <None>")
 
         # Summarize all steps, giving the number of jobs they started and
         # how many are finished.
         result.extend(self._stepsSummary())
 
         # Add information about each step in detail.
-        for count, stepName in enumerate(self.specification['steps'], start=1):
-            append('Step %d: %s' % (count, stepName))
+        for count, stepName in enumerate(self.specification["steps"], start=1):
+            append("Step %d: %s" % (count, stepName))
             result.extend(self._stepSummary(stepName))
 
-        return '\n'.join(result)
+        return "\n".join(result)

@@ -16,41 +16,50 @@ class SAcct(object):
         sacct for the full list of possible field names.
     """
 
-    DEFAULT_FIELD_NAMES = 'JobName,State,Elapsed,Nodelist'
+    DEFAULT_FIELD_NAMES = "JobName,State,Elapsed,Nodelist"
 
     def __init__(self, jobIdsOfInterest, fieldNames=None):
-        self.fieldNames = (fieldNames or environ.get('SP_STATUS_FIELD_NAMES')
-                           or self.DEFAULT_FIELD_NAMES)
+        self.fieldNames = (
+            fieldNames
+            or environ.get("SP_STATUS_FIELD_NAMES")
+            or self.DEFAULT_FIELD_NAMES
+        )
         args = [
-            'sacct', '-P', '--format', 'JobId,' + self.fieldNames,
-            '--jobs', ','.join(map(str, sorted(jobIdsOfInterest)))
+            "sacct",
+            "-P",
+            "--format",
+            "JobId," + self.fieldNames,
+            "--jobs",
+            ",".join(map(str, sorted(jobIdsOfInterest))),
         ]
         try:
             out = subprocess.check_output(args, universal_newlines=True)
         except OSError as e:
-            raise SAcctError("Encountered OSError (%s) when running '%s'" %
-                             (e, ' '.join(args)))
+            raise SAcctError(
+                "Encountered OSError (%s) when running '%s'" % (e, " ".join(args))
+            )
 
         self.jobs = jobs = defaultdict(dict)
-        fieldNamesLower = tuple(map(str.lower, self.fieldNames.split(',')))
+        fieldNamesLower = tuple(map(str.lower, self.fieldNames.split(",")))
 
-        for count, line in enumerate(out.split('\n')):
-            if count == 0 or (count == 1 and line and line[0] == '-'):
+        for count, line in enumerate(out.split("\n")):
+            if count == 0 or (count == 1 and line and line[0] == "-"):
                 # First or second header line. When sacct is run with no
                 # arguments it for some reason prints a second header line
                 # that consists of hyphens and spaces. Check for that just
                 # in case it prints it under other circumstances.
                 continue
             elif line:
-                fields = line.split('|')
-                if fields[0].find('.') > -1:
+                fields = line.split("|")
+                if fields[0].find(".") > -1:
                     # Ignore lines that have a job id like 1153494.extern
                     continue
                 jobId = int(fields[0])
                 if jobId in jobs:
                     raise SAcctError(
-                        "Job id %d found more than once in '%s' output" %
-                        (jobId, ' '.join(args)))
+                        "Job id %d found more than once in '%s' output"
+                        % (jobId, " ".join(args))
+                    )
                 if jobId in jobIdsOfInterest:
                     jobIdsOfInterest.remove(jobId)
                     fields.pop(0)
@@ -60,9 +69,13 @@ class SAcct(object):
 
         if jobIdsOfInterest:
             raise SAcctError(
-                'sacct did not return information about the following job '
-                'id%s: %s' % ('' if len(jobIdsOfInterest) == 1 else 's',
-                              ', '.join(map(str, sorted(jobIdsOfInterest)))))
+                "sacct did not return information about the following job "
+                "id%s: %s"
+                % (
+                    "" if len(jobIdsOfInterest) == 1 else "s",
+                    ", ".join(map(str, sorted(jobIdsOfInterest))),
+                )
+            )
 
     def finished(self, jobId):
         """
@@ -72,7 +85,7 @@ class SAcct(object):
         @raise KeyError: If the job id cannot be found.
         @return: A C{bool} indicating whether the job has finished.
         """
-        return self.jobs[jobId]['state'] not in {'PENDING', 'RUNNING'}
+        return self.jobs[jobId]["state"] not in {"PENDING", "RUNNING"}
 
     def failed(self, jobId):
         """
@@ -82,7 +95,7 @@ class SAcct(object):
         @raise KeyError: If the job id cannot be found.
         @return: A C{bool} indicating whether the job failed.
         """
-        return self.jobs[jobId]['state'] == 'FAILED'
+        return self.jobs[jobId]["state"] == "FAILED"
 
     def completed(self, jobId):
         """
@@ -92,7 +105,7 @@ class SAcct(object):
         @raise KeyError: If the job id cannot be found.
         @return: A C{bool} indicating whether the job completed.
         """
-        return self.jobs[jobId]['state'] == 'COMPLETED'
+        return self.jobs[jobId]["state"] == "COMPLETED"
 
     def state(self, jobId):
         """
@@ -102,7 +115,7 @@ class SAcct(object):
         @raise KeyError: If the job id cannot be found.
         @return: The C{str} job state.
         """
-        return self.jobs[jobId]['state']
+        return self.jobs[jobId]["state"]
 
     def summarize(self, jobId):
         """
@@ -113,6 +126,7 @@ class SAcct(object):
         @return: a C{str} describing the job's state.
         """
         jobInfo = self.jobs[jobId]
-        return ', '.join(
-            '%s=%s' % (fieldName, jobInfo[fieldName.lower()])
-            for fieldName in self.fieldNames.split(','))
+        return ", ".join(
+            "%s=%s" % (fieldName, jobInfo[fieldName.lower()])
+            for fieldName in self.fieldNames.split(",")
+        )

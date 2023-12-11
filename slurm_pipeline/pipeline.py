@@ -9,7 +9,7 @@ from getpass import getuser
 try:
     from subprocess import DEVNULL  # py3k
 except ImportError:
-    DEVNULL = open(os.devnull, 'r+b')
+    DEVNULL = open(os.devnull, "r+b")
 
 from .base import SlurmPipelineBase
 from .error import SchedulingError, SpecificationError
@@ -25,15 +25,20 @@ class SlurmPipeline(SlurmPipelineBase):
     #   TASK: NAME 297483 297485 297490
     # containing a task name (with no spaces) followed by zero or more numeric
     # job ids. The following regex just matches 'TASK' and the task name.
-    TASK_NAME_LINE = re.compile(r'^TASK:\s*(\S+)')
+    TASK_NAME_LINE = re.compile(r"^TASK:\s*(\S+)")
 
     # Limits on the --nice argument to sbatch. In later SLURM versions the
     # limits are +/-2147483645. See https://slurm.schedmd.com/sbatch.html
     NICE_HIGHEST = -10000
     NICE_LOWEST = 10000
 
-    ENV_VARS = ('SP_DEPENDENCY_ARG', 'SP_FORCE', 'SP_NICE_ARG', 'SP_SKIP',
-                'SP_ORIGINAL_ARGS')
+    ENV_VARS = (
+        "SP_DEPENDENCY_ARG",
+        "SP_FORCE",
+        "SP_NICE_ARG",
+        "SP_SKIP",
+        "SP_ORIGINAL_ARGS",
+    )
 
     @staticmethod
     def checkSpecification(specification):
@@ -46,34 +51,45 @@ class SlurmPipeline(SlurmPipelineBase):
         """
         SlurmPipelineBase.checkSpecification(specification)
 
-        for count, step in enumerate(specification['steps'], start=1):
+        for count, step in enumerate(specification["steps"], start=1):
             try:
-                cwd = step['cwd']
+                cwd = step["cwd"]
             except KeyError:
-                script = step['script']
+                script = step["script"]
             else:
                 if not path.isdir(cwd):
                     raise SpecificationError(
-                        'Specification step %d specifies a working directory '
-                        '(%r) that does not exist' % (count, cwd))
+                        "Specification step %d specifies a working directory "
+                        "(%r) that does not exist" % (count, cwd)
+                    )
 
-                script = step['script']
+                script = step["script"]
                 if not path.isabs(script):
                     script = path.join(cwd, script)
 
             if not path.exists(script):
                 raise SpecificationError(
-                    'The script %r in step %d does not exist' %
-                    (step['script'], count))
+                    "The script %r in step %d does not exist" % (step["script"], count)
+                )
 
             if not os.access(script, os.X_OK):
                 raise SpecificationError(
-                    'The script %r in step %d is not executable' %
-                    (step['script'], count))
+                    "The script %r in step %d is not executable"
+                    % (step["script"], count)
+                )
 
-    def schedule(self, force=False, firstStep=None, lastStep=None, sleep=0.0,
-                 scriptArgs=None, skip=None, startAfter=None, nice=None,
-                 printOutput=False):
+    def schedule(
+        self,
+        force=False,
+        firstStep=None,
+        lastStep=None,
+        sleep=0.0,
+        scriptArgs=None,
+        skip=None,
+        startAfter=None,
+        nice=None,
+        printOutput=False,
+    ):
         """
         Schedule the running of our execution specification.
 
@@ -116,29 +132,30 @@ class SlurmPipeline(SlurmPipelineBase):
             specification, updated with information about this scheduling.
         """
         specification = self.specification
-        steps = specification['steps']
+        steps = specification["steps"]
         nSteps = len(steps)
         if nSteps and lastStep is not None and firstStep is None:
-            firstStep = list(specification['steps'])[0]
+            firstStep = list(specification["steps"])[0]
         skip = set(skip or ())
         self._checkRuntime(steps, firstStep, lastStep, skip, nice)
-        specification.update({
-            'firstStep': firstStep,
-            'force': force,
-            'lastStep': lastStep,
-            'nice': nice,
-            'scheduledAt': time.time(),
-            'scriptArgs': scriptArgs,
-            'skip': skip,
-            'sleep': sleep,
-            'startAfter': startAfter,
-            'steps': steps,
-            'user': getuser(),
-        })
+        specification.update(
+            {
+                "firstStep": firstStep,
+                "force": force,
+                "lastStep": lastStep,
+                "nice": nice,
+                "scheduledAt": time.time(),
+                "scriptArgs": scriptArgs,
+                "skip": skip,
+                "sleep": sleep,
+                "startAfter": startAfter,
+                "steps": steps,
+                "user": getuser(),
+            }
+        )
 
-        environ['SP_FORCE'] = str(int(force))
-        environ['SP_NICE_ARG'] = (
-            '--nice' if nice is None else '--nice=%d' % nice)
+        environ["SP_FORCE"] = str(int(force))
+        environ["SP_NICE_ARG"] = "--nice" if nice is None else "--nice=%d" % nice
         firstStepFound = lastStepFound = False
 
         for stepIndex, stepName in enumerate(steps):
@@ -165,14 +182,17 @@ class SlurmPipeline(SlurmPipelineBase):
                 impliedSkip = False
 
             self._scheduleStep(
-                stepName, steps, scriptArgs,
-                impliedSkip or stepName in skip or 'skip' in steps[stepName],
-                startAfter)
+                stepName,
+                steps,
+                scriptArgs,
+                impliedSkip or stepName in skip or "skip" in steps[stepName],
+                startAfter,
+            )
 
             if printOutput:
                 step = steps[stepName]
-                if step['stdout']:
-                    print(step['stdout'], end='')
+                if step["stdout"]:
+                    print(step["stdout"], end="")
 
             # If we're supposed to pause between scheduling steps and this
             # is not the last step, then sleep.
@@ -199,9 +219,9 @@ class SlurmPipeline(SlurmPipelineBase):
             the current specification may start immediately.
         """
         step = steps[stepName]
-        step['tasks'] = defaultdict(set)
-        step['skip'] = skip
-        scriptArgsStr = ' '.join(map(str, scriptArgs)) if scriptArgs else ''
+        step["tasks"] = defaultdict(set)
+        step["skip"] = skip
+        scriptArgsStr = " ".join(map(str, scriptArgs)) if scriptArgs else ""
         if scriptArgs:
             # Single quote each script arg so shell metacharacters and
             # whitespace are preserved.
@@ -210,61 +230,64 @@ class SlurmPipeline(SlurmPipelineBase):
                 if "'" in arg:
                     raise SchedulingError(
                         'Script argument "%s" contains a single quote, which '
-                        'is currently not supported.' % arg)
+                        "is currently not supported." % arg
+                    )
                 else:
                     args.append("'%s'" % arg)
-            scriptArgsStr = ' '.join(args)
+            scriptArgsStr = " ".join(args)
         else:
-            scriptArgsStr = ''
+            scriptArgsStr = ""
 
-        if step.get('error step', False):
-            separator = '?'
-            after = 'afternotok'
+        if step.get("error step", False):
+            separator = "?"
+            after = "afternotok"
         else:
-            separator = ','
-            after = 'afterok'
+            separator = ","
+            after = "afterok"
 
         # taskDependencies is keyed by task name. These are the tasks
         # started by the steps that the current step depends on.  Its
         # values are sets of SLURM job ids the tasks that step started and
         # which this step therefore depends on.
-        step['taskDependencies'] = taskDependencies = defaultdict(set)
-        for stepName in step.get('dependencies', ()):
-            for taskName, jobIds in steps[stepName]['tasks'].items():
+        step["taskDependencies"] = taskDependencies = defaultdict(set)
+        for stepName in step.get("dependencies", ()):
+            for taskName, jobIds in steps[stepName]["tasks"].items():
                 taskDependencies[taskName].update(jobIds)
 
         if taskDependencies:
-            if 'collect' in step:
+            if "collect" in step:
                 # This step is a 'collector'. I.e., it is dependent on all
                 # tasks from all its dependent steps and cannot run until
                 # they have all finished. We will only run the script once,
                 # and tell it about all job ids for all tasks that are
                 # depended on.
                 env = environ.copy()
-                env['SP_ORIGINAL_ARGS'] = scriptArgsStr
-                env['SP_SKIP'] = env['SP_SIMULATE'] = str(int(skip))
+                env["SP_ORIGINAL_ARGS"] = scriptArgsStr
+                env["SP_SKIP"] = env["SP_SIMULATE"] = str(int(skip))
                 dependencies = separator.join(
-                    sorted(('%s:%d' % (after, jobId))
-                           for jobIds in taskDependencies.values()
-                           for jobId in jobIds))
-                env['SP_DEPENDENCY_ARG'] = '--dependency=' + dependencies
+                    sorted(
+                        ("%s:%d" % (after, jobId))
+                        for jobIds in taskDependencies.values()
+                        for jobId in jobIds
+                    )
+                )
+                env["SP_DEPENDENCY_ARG"] = "--dependency=" + dependencies
                 self._runStepScript(step, sorted(taskDependencies), env)
             else:
                 # The script for this step gets run once for each task in the
                 # steps it depends on.
                 for taskName in sorted(taskDependencies):
                     env = environ.copy()
-                    env['SP_ORIGINAL_ARGS'] = scriptArgsStr
-                    env['SP_SKIP'] = env['SP_SIMULATE'] = str(int(skip))
-                    jobIds = steps[stepName]['tasks'][taskName]
+                    env["SP_ORIGINAL_ARGS"] = scriptArgsStr
+                    env["SP_SKIP"] = env["SP_SIMULATE"] = str(int(skip))
+                    jobIds = steps[stepName]["tasks"][taskName]
                     dependencies = separator.join(
-                        sorted(('%s:%d' % (after, jobId))
-                               for jobId in jobIds))
+                        sorted(("%s:%d" % (after, jobId)) for jobId in jobIds)
+                    )
                     if dependencies:
-                        env['SP_DEPENDENCY_ARG'] = ('--dependency=' +
-                                                    dependencies)
+                        env["SP_DEPENDENCY_ARG"] = "--dependency=" + dependencies
                     else:
-                        env.pop('SP_DEPENDENCY_ARG', None)
+                        env.pop("SP_DEPENDENCY_ARG", None)
                     self._runStepScript(step, [taskName], env)
         else:
             # Either this step has no dependencies or the steps it is
@@ -273,12 +296,13 @@ class SlurmPipeline(SlurmPipelineBase):
 
             if startAfter:
                 dependencies = separator.join(
-                    sorted(('%s:%d' % (after, jobId)) for jobId in startAfter))
-                env['SP_DEPENDENCY_ARG'] = '--dependency=' + dependencies
+                    sorted(("%s:%d" % (after, jobId)) for jobId in startAfter)
+                )
+                env["SP_DEPENDENCY_ARG"] = "--dependency=" + dependencies
             else:
-                env.pop('SP_DEPENDENCY_ARG', None)
+                env.pop("SP_DEPENDENCY_ARG", None)
 
-            if 'dependencies' in step:
+            if "dependencies" in step:
                 # The step has dependencies, but the dependent steps did
                 # not start any tasks. Run the step as though there were no
                 # dependencies.
@@ -289,11 +313,11 @@ class SlurmPipeline(SlurmPipelineBase):
                 # into the SP_DEPENDENCY_ARG environment variable.
                 args = [] if scriptArgs is None else list(map(str, scriptArgs))
 
-            env['SP_ORIGINAL_ARGS'] = scriptArgsStr
-            env['SP_SKIP'] = env['SP_SIMULATE'] = str(int(skip))
+            env["SP_ORIGINAL_ARGS"] = scriptArgsStr
+            env["SP_SKIP"] = env["SP_SIMULATE"] = str(int(skip))
             self._runStepScript(step, args, env)
 
-        step['scheduledAt'] = time.time()
+        step["scheduledAt"] = time.time()
 
     def _runStepScript(self, step, args, env):
         """
@@ -308,61 +332,80 @@ class SlurmPipeline(SlurmPipelineBase):
         """
 
         # Record all SP_* environment variables available to the script.
-        step['environ'] = dict((var, env[var]) for var in self.ENV_VARS
-                               if var in env)
+        step["environ"] = dict((var, env[var]) for var in self.ENV_VARS if var in env)
 
         try:
-            step['stdout'] = subprocess.check_output(
-                [step['script']] + args, cwd=step.get('cwd', '.'), env=env,
-                stdin=DEVNULL, universal_newlines=True)
+            step["stdout"] = subprocess.check_output(
+                [step["script"]] + args,
+                cwd=step.get("cwd", "."),
+                env=env,
+                stdin=DEVNULL,
+                universal_newlines=True,
+            )
         except subprocess.CalledProcessError as e:
             import sys
+
             if sys.version_info >= (3, 5):
                 raise SchedulingError(
                     "Could not execute step '%s' script '%s' in directory "
                     "'%s'. Attempted command: '%s'. Exit status: %s. Standard "
-                    "output: '%s'. Standard error: '%s'." % (
-                        step['name'], step['script'], step.get('cwd', '.'),
-                        e.cmd, e.returncode, e.output, e.stderr))
+                    "output: '%s'. Standard error: '%s'."
+                    % (
+                        step["name"],
+                        step["script"],
+                        step.get("cwd", "."),
+                        e.cmd,
+                        e.returncode,
+                        e.output,
+                        e.stderr,
+                    )
+                )
             else:
                 raise SchedulingError(
                     "Could not execute step '%s' script '%s' in directory "
                     "'%s'. Attempted command: '%s'. Exit status: %s."
-                    % (step['name'], step['script'],  step.get('cwd', '.'),
-                       e.cmd, e.returncode))
+                    % (
+                        step["name"],
+                        step["script"],
+                        step.get("cwd", "."),
+                        e.cmd,
+                        e.returncode,
+                    )
+                )
         except OSError as e:
-            command = ' '.join([step['script']] + args)
+            command = " ".join([step["script"]] + args)
             raise SchedulingError(
                 "Could not execute step '%s' script '%s' in directory "
-                "'%s'. Attempted command: '%s'. Error: %s" % (
-                    step['name'], step['script'], step.get('cwd', '.'),
-                    command, e))
+                "'%s'. Attempted command: '%s'. Error: %s"
+                % (step["name"], step["script"], step.get("cwd", "."), command, e)
+            )
 
         # Look at all output lines for task names and SLURM job ids created
         # (if any) by this script. Ignore any non-matching output.
-        tasks = step['tasks']
-        for line in step['stdout'].split('\n'):
+        tasks = step["tasks"]
+        for line in step["stdout"].split("\n"):
             match = self.TASK_NAME_LINE.match(line)
             if match:
                 taskName = match.group(1)
                 # The job ids follow the 'TASK:' string and the task name.
                 # If they contain duplicates we consider it an error.
                 try:
-                    jobIds = list(map(int, line[match.end(1):].split()))
+                    jobIds = list(map(int, line[match.end(1) :].split()))
                 except ValueError:
                     raise SchedulingError(
-                        'Task name %r was output with non-numeric job ids by '
-                        '%r script in step named %r. Output line was %r' %
-                        (taskName, step['script'], step['name'], line))
+                        "Task name %r was output with non-numeric job ids by "
+                        "%r script in step named %r. Output line was %r"
+                        % (taskName, step["script"], step["name"], line)
+                    )
                 if len(jobIds) != len(set(jobIds)):
                     raise SchedulingError(
-                        'Task name %r was output with a duplicate in its '
-                        'job ids %r by %r script in step named %r' %
-                        (taskName, jobIds, step['script'], step['name']))
+                        "Task name %r was output with a duplicate in its "
+                        "job ids %r by %r script in step named %r"
+                        % (taskName, jobIds, step["script"], step["name"])
+                    )
                 tasks[taskName].update(jobIds)
 
-    def _checkRuntime(self, steps, firstStep=None, lastStep=None, skip=None,
-                      nice=None):
+    def _checkRuntime(self, steps, firstStep=None, lastStep=None, skip=None, nice=None):
         """
         Check that a proposed scheduling makes sense.
 
@@ -388,39 +431,42 @@ class SlurmPipeline(SlurmPipelineBase):
 
         if firstStep is not None and firstStep not in steps:
             raise SchedulingError(
-                'First step %r not found in specification' % firstStep)
+                "First step %r not found in specification" % firstStep
+            )
 
         if lastStep is not None and lastStep not in steps:
-            raise SchedulingError(
-                'Last step %r not found in specification' % lastStep)
+            raise SchedulingError("Last step %r not found in specification" % lastStep)
 
         if nice is not None:
             try:
                 nice = int(nice)
             except ValueError:
-                raise SchedulingError(
-                    'Nice (priority) value %r is not numeric' % nice)
+                raise SchedulingError("Nice (priority) value %r is not numeric" % nice)
             else:
                 if nice < self.NICE_HIGHEST or nice > self.NICE_LOWEST:
                     raise SchedulingError(
-                        'Nice (priority) value %r is outside the allowed '
-                        '[%d, %d] range' %
-                        (nice, self.NICE_HIGHEST, self.NICE_LOWEST))
+                        "Nice (priority) value %r is outside the allowed "
+                        "[%d, %d] range" % (nice, self.NICE_HIGHEST, self.NICE_LOWEST)
+                    )
 
         for step in steps.values():
-            if step['name'] == firstStep:
+            if step["name"] == firstStep:
                 firstStepFound = True
 
-            if step['name'] == lastStep:
+            if step["name"] == lastStep:
                 if firstStep is not None and not firstStepFound:
                     raise SchedulingError(
-                        'Last step (%r) occurs before first step (%r) in '
-                        'the specification' % (lastStep, firstStep))
+                        "Last step (%r) occurs before first step (%r) in "
+                        "the specification" % (lastStep, firstStep)
+                    )
 
         if skip:
             unknownSteps = skip - set(steps)
             if unknownSteps:
                 raise SchedulingError(
-                    'Unknown skip step%s (%s) passed to schedule' % (
-                        '' if len(unknownSteps) == 1 else 's',
-                        ', '.join(sorted(unknownSteps))))
+                    "Unknown skip step%s (%s) passed to schedule"
+                    % (
+                        "" if len(unknownSteps) == 1 else "s",
+                        ", ".join(sorted(unknownSteps)),
+                    )
+                )

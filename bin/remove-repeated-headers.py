@@ -16,8 +16,8 @@ invocations of a command by sbatch.py.
 import sys
 
 header = next(sys.stdin)
-print(header, end='')
+print(header, end="")
 
 for line in sys.stdin:
     if line != header:
-        print(line, end='')
+        print(line, end="")
