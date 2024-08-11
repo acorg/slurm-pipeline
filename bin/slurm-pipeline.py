@@ -34,7 +34,6 @@ parser.add_argument(
     "--force",
     "-f",
     action="store_true",
-    default=False,
     help=(
         "If specified, indicate to step scripts that they may overwrite "
         "pre-existing results files."

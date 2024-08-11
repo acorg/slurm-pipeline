@@ -5,12 +5,11 @@ from collections import defaultdict
 from .error import SAcctError
 
 
-class SAcct(object):
+class SAcct:
     """
     Fetch information about job id status from sacct.
 
-    @param jobIdsOfInterest: A C{set} of C{int} job ids to retrieve
-        accounting information for.
+    @param jobIds: A C{set} of C{int} job ids to retrieve accounting information for.
     @param fieldNames: A C{list} of C{str} job field names to obtain from
         sacct. If C{None}, C{self.DEFAULT_FIELD_NAMES} will be used. See man
         sacct for the full list of possible field names.
@@ -18,19 +17,30 @@ class SAcct(object):
 
     DEFAULT_FIELD_NAMES = "JobName,State,Elapsed,Nodelist"
 
-    def __init__(self, jobIdsOfInterest, fieldNames=None):
+    def __init__(self, jobIds, fieldNames=None):
         self.fieldNames = (
             fieldNames
             or environ.get("SP_STATUS_FIELD_NAMES")
             or self.DEFAULT_FIELD_NAMES
         )
+        self.jobs = self._callSacct(jobIds) if jobIds else {}
+
+    def _callSacct(self, jobIds):
+        """
+        Call sacct to collect information about the job ids of interest.
+
+        @param jobIds: A C{set} of C{int} job ids to get accounting information for.
+        """
+        # Make a copy of our argument, seeing as we are going to modify it.
+        jobIds = set(jobIds)
+        jobs = defaultdict(dict)
         args = [
             "sacct",
             "-P",
             "--format",
             "JobId," + self.fieldNames,
             "--jobs",
-            ",".join(map(str, sorted(jobIdsOfInterest))),
+            ",".join(map(str, sorted(jobIds))),
         ]
         try:
             out = subprocess.check_output(args, universal_newlines=True)
@@ -39,7 +49,6 @@ class SAcct(object):
                 "Encountered OSError (%s) when running '%s'" % (e, " ".join(args))
             )
 
-        self.jobs = jobs = defaultdict(dict)
         fieldNamesLower = tuple(map(str.lower, self.fieldNames.split(",")))
 
         for count, line in enumerate(out.split("\n")):
@@ -60,22 +69,24 @@ class SAcct(object):
                         "Job id %d found more than once in '%s' output"
                         % (jobId, " ".join(args))
                     )
-                if jobId in jobIdsOfInterest:
-                    jobIdsOfInterest.remove(jobId)
+                if jobId in jobIds:
+                    jobIds.remove(jobId)
                     fields.pop(0)
                     jobInfo = jobs[jobId]
                     for fieldName, value in zip(fieldNamesLower, fields):
                         jobInfo[fieldName] = value
 
-        if jobIdsOfInterest:
+        if jobIds:
             raise SAcctError(
                 "sacct did not return information about the following job "
                 "id%s: %s"
                 % (
-                    "" if len(jobIdsOfInterest) == 1 else "s",
-                    ", ".join(map(str, sorted(jobIdsOfInterest))),
+                    "" if len(jobIds) == 1 else "s",
+                    ", ".join(map(str, sorted(jobIds))),
                 )
             )
+
+        return jobs
 
     def finished(self, jobId):
         """

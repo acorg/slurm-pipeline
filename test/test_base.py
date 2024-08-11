@@ -30,7 +30,7 @@ class TestSlurmPipelineBase(TestCase):
             else:
                 error = (
                     r"^Could not read JSON from 'file': Expecting value: "
-                    f"line 1 column 1 \\(char 0\\)$"
+                    r"line 1 column 1 \(char 0\)$"
                 )
                 self.assertRaisesRegex(ValueError, error, SlurmPipelineBase, "file")
 
@@ -49,8 +49,8 @@ class TestSlurmPipelineBase(TestCase):
             else:
                 error = (
                     r"^Could not read JSON from 'file': Expecting property "
-                    f"name enclosed in double quotes: line 1 column 2 "
-                    f"\\(char 1\\)$"
+                    r"name enclosed in double quotes: line 1 column 2 "
+                    r"\(char 1\)$"
                 )
                 self.assertRaisesRegex(ValueError, error, SlurmPipelineBase, "file")
 

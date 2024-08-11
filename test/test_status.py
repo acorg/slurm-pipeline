@@ -2,7 +2,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from slurm_pipeline.error import SpecificationError
-from slurm_pipeline.status import SlurmPipelineStatus
+from slurm_pipeline.status import SlurmPipelineStatus, SlurmPipelineStatusCollection
 
 
 class TestSlurmPipelineStatus(TestCase):
@@ -1025,3 +1025,244 @@ Step 1: start-step
     SP_SKIP: 0""",
             sps.toStr(),
         )
+
+
+class TestSlurmPipelineStatusCollection(TestCase):
+    """
+    Test the SlurmPipelineStatusCollection class.
+    """
+
+    def testNonIdenticalSteps(self):
+        """
+        If two specifications are passed that do not have the same list of steps,
+        a ValueError error must be raised.
+        """
+        status1 = {
+            "user": "sally",
+            "firstStep": None,
+            "force": False,
+            "lastStep": None,
+            "nice": "None",
+            "scheduledAt": 1481379658.5455897,
+            "scriptArgs": ["hey", "you"],
+            "skip": [],
+            "sleep": 5.0,
+            "startAfter": [],
+            "steps": [
+                {
+                    "cwd": "00-start",
+                    "environ": {
+                        "SP_FORCE": "1",
+                        "SP_SKIP": "0",
+                    },
+                    "name": "step-1",
+                    "scheduledAt": 1481379659.1530972,
+                    "script": "00-start/start.sh",
+                    "skip": False,
+                    "stdout": "",
+                    "taskDependencies": {},
+                    "tasks": {},
+                },
+            ],
+        }
+
+        status2 = {
+            "user": "sally",
+            "firstStep": None,
+            "force": False,
+            "lastStep": None,
+            "nice": "None",
+            "scheduledAt": 1481379658.5455897,
+            "scriptArgs": ["hey", "you"],
+            "skip": [],
+            "sleep": 5.0,
+            "startAfter": [],
+            "steps": [
+                {
+                    "cwd": "00-start",
+                    "environ": {
+                        "SP_FORCE": "1",
+                        "SP_SKIP": "0",
+                    },
+                    "name": "step-2",
+                    "scheduledAt": 1481379659.1530972,
+                    "script": "00-start/start.sh",
+                    "skip": False,
+                    "stdout": "",
+                    "taskDependencies": {},
+                    "tasks": {},
+                },
+            ],
+        }
+
+        error = (
+            r"^The list of steps found in the first specification \['step-1'\] does "
+            r"not match that found in specification number 2: \['step-2'\]\.$"
+        )
+        self.assertRaisesRegex(
+            ValueError, error, SlurmPipelineStatusCollection, (status1, status2)
+        )
+
+    def testNonUniqueNames(self):
+        """
+        The list of names must not have any duplicates.
+        """
+        status = {
+            "user": "sally",
+            "firstStep": None,
+            "force": False,
+            "lastStep": None,
+            "nice": "None",
+            "scheduledAt": 1481379658.5455897,
+            "scriptArgs": ["hey", "you"],
+            "skip": [],
+            "sleep": 5.0,
+            "startAfter": [],
+            "steps": [
+                {
+                    "cwd": "00-start",
+                    "environ": {
+                        "SP_FORCE": "1",
+                        "SP_SKIP": "0",
+                    },
+                    "name": "step-1",
+                    "scheduledAt": 1481379659.1530972,
+                    "script": "00-start/start.sh",
+                    "skip": False,
+                    "stdout": "",
+                    "taskDependencies": {},
+                    "tasks": {},
+                },
+            ],
+        }
+
+        error = (
+            r"^The list of specification names contains at least one "
+            r"duplicate: \['a', 'a'\]\.$"
+        )
+        self.assertRaisesRegex(
+            ValueError,
+            error,
+            SlurmPipelineStatusCollection,
+            (status, status),
+            ("a", "a"),
+        )
+
+    def testUnequalLengths(self):
+        """
+        The lists of specifications and names must have the same lengths.
+        """
+        error = (
+            r"^The specifications and names lists are not the same "
+            r"lengths \(0 != 1\)\.$"
+        )
+        self.assertRaisesRegex(
+            ValueError, error, SlurmPipelineStatusCollection, (), ("a",)
+        )
+
+    @patch("subprocess.check_output")
+    def testJobs(self, subprocessMock):
+        """
+        Test a realistic situation.
+        """
+
+        status1 = {
+            "force": False,
+            "lastStep": None,
+            "scheduledAt": 1481379658.5455897,
+            "scriptArgs": [],
+            "skip": [],
+            "startAfter": None,
+            "steps": [
+                {
+                    "name": "start",
+                    "scheduledAt": 1481379659.1530972,
+                    "script": "start.sh",
+                    "stdout": "",
+                    "taskDependencies": {},
+                    "tasks": {
+                        "xxx": [12, 34],
+                    },
+                },
+                {
+                    "name": "end",
+                    "scheduledAt": 1481379659.1530972,
+                    "script": "end.sh",
+                    "stdout": "",
+                    "taskDependencies": {},
+                    "tasks": {
+                        "yyy": [56, 78, 90],
+                    },
+                },
+            ],
+        }
+
+        status2 = {
+            "force": False,
+            "lastStep": None,
+            "scheduledAt": 1481379658.5455897,
+            "scriptArgs": [],
+            "skip": [],
+            "startAfter": None,
+            "steps": [
+                {
+                    "name": "start",
+                    "scheduledAt": 1481379659.1530972,
+                    "script": "start.sh",
+                    "stdout": "",
+                    "taskDependencies": {},
+                    "tasks": {
+                        "xxx": [13, 35],
+                    },
+                },
+                {
+                    "name": "end",
+                    "scheduledAt": 1481379659.1530972,
+                    "script": "end.sh",
+                    "stdout": "",
+                    "taskDependencies": {},
+                    "tasks": {
+                        "yyy": [57, 79, 91],
+                    },
+                },
+            ],
+        }
+
+        subprocessMock.side_effect = [
+            (
+                "JobID|JobName|State|Elapsed|Nodelist\n"
+                "12|name|RUNNING|04:32:00|cpu-3\n"
+                "34|name|COMPLETED|04:32:00|cpu-3\n"
+                "56|name|FAILED|04:32:00|cpu-4\n"
+                "78|name|COMPLETED|04:32:00|cpu-4\n"
+                "90|name|RUNNING|04:32:00|cpu-5\n"
+            ),
+            (
+                "JobID|JobName|State|Elapsed|Nodelist\n"
+                "13|name|RUNNING|00:00:10|cpu-3\n"
+                "35|name|COMPLETED|00:01:00|cpu-3\n"
+                "57|name|PENDING|00:00:00|cpu-4\n"
+                "79|name|COMPLETED|04:32:00|cpu-4\n"
+                "91|name|FAILED|04:32:00|cpu-5\n"
+            ),
+        ]
+
+        spsc = SlurmPipelineStatusCollection((status1, status2), zeroSecondsValue=999)
+
+        # Cheap & nasty way to check that SlurmPipelineStatusCollection put
+        # things into a DataFrame in the expected way.
+        self.maxDiff = None
+        expected = """\
+        name   step task  jobId     status   node   elapsed  seconds
+0  unnamed-0  start  xxx     12    RUNNING  cpu-3  04:32:00    16320
+1  unnamed-0  start  xxx     34  COMPLETED  cpu-3  04:32:00    16320
+2  unnamed-0    end  yyy     56     FAILED  cpu-4  04:32:00    16320
+3  unnamed-0    end  yyy     78  COMPLETED  cpu-4  04:32:00    16320
+4  unnamed-0    end  yyy     90    RUNNING  cpu-5  04:32:00    16320
+5  unnamed-1  start  xxx     13    RUNNING  cpu-3  00:00:10       10
+6  unnamed-1  start  xxx     35  COMPLETED  cpu-3  00:01:00       60
+7  unnamed-1    end  yyy     57    PENDING  cpu-4  00:00:00      999
+8  unnamed-1    end  yyy     79  COMPLETED  cpu-4  04:32:00    16320
+9  unnamed-1    end  yyy     91     FAILED  cpu-5  04:32:00    16320\
+"""
+        self.assertEqual(expected, str(spsc.df))

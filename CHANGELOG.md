@@ -1,3 +1,7 @@
+# Version 4.0.15 - Aug 11, 2024
+
+Added `bin/slurm-pipeline-status-plot.py`.
+
 # Version 4.0.14 - Dec 11, 2023
 
 Make loading the JSON specification file give a better error message,
