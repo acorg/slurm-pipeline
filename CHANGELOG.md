@@ -1,3 +1,7 @@
+# Version 4.0.16 - Aug 11, 2024
+
+Small tweaks to improve the appearance of `bin/slurm-pipeline-status-plot.py` plots.
+
 # Version 4.0.15 - Aug 11, 2024
 
 Added `bin/slurm-pipeline-status-plot.py`.

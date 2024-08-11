@@ -9,23 +9,29 @@ from plotly.io import write_image, write_html
 
 from slurm_pipeline.status import SlurmPipelineStatusCollection
 
-STATUS_ORDER = (
-    "SUSPENDED",
-    "REVOKED",
-    "RESIZING",
-    "REQUEUED",
-    "PREEMPTED",
-    "NODE_FAIL",
-    "DEADLINE",
-    "BOOT_FAIL",
-    "OUT_OF_MEMORY",
-    "TIMEOUT",
-    "FAILED",
-    "CANCELLED",
-    "PENDING",
-    "COMPLETED",
-    "RUNNING",
-)
+# Note that the order here is important. It determines the legend order.  These values
+# are (mainly) taken from x.colors.qualitative.Plotly with the order changed to be as I
+# want it.
+STATUS_COLORS = {
+    "PENDING": "#B6E880",
+    "RUNNING": "#19D3F3",
+    "COMPLETED": "#00CC96",
+    "FAILED": "#EF553B",
+    "TIMEOUT": "#FF6692",
+    "OUT_OF_MEMORY": "#FF97FF",
+    "CANCELLED": "#BAB0AC",
+    "BOOT_FAIL": "#636EFA",
+    "DEADLINE": "#FFA15A",
+    "NODE_FAIL": "#77B7B2",
+    "PREEMPTED": "#54A24B",
+    "REQUEUED": "#FB00D1",
+    "RESIZING": "#AB63FA",
+    "REVOKED": "#FD3216",
+    "SUSPENDED": "#FECB52",
+}
+
+# Sanity check that there are no repeated colors.
+assert len(set(STATUS_COLORS.values())) == len(STATUS_COLORS)
 
 
 def parseArgs():
@@ -55,6 +61,26 @@ def parseArgs():
         "--html",
         help="The (optional) output HTML file.",
         metavar="FILE.html",
+    )
+
+    parser.add_argument(
+        "--title",
+        help="The overall plot title.",
+        metavar="TITLE",
+    )
+
+    parser.add_argument(
+        "--xtitle",
+        default="Pipeline step",
+        help="The x-axis title.",
+        metavar="TITLE",
+    )
+
+    parser.add_argument(
+        "--ytitle",
+        default="Count",
+        help="The y-axis title.",
+        metavar="TITLE",
     )
 
     parser.add_argument(
@@ -95,31 +121,48 @@ def main():
 
     spsc = SlurmPipelineStatusCollection(args.statusFiles, names)
 
+    if args.title is not None:
+        title = args.title
+    else:
+        if len(names) > 1:
+            title = f"Pipeline task summary for {len(names)} separate runs"
+        else:
+            title = "Pipeline task summary"
+
+    # Add a column full of 1s that we will put on the y-axis to show the count of tasks
+    # at each step.
+    spsc.df["one"] = 1
+
     fig = px.bar(
         data_frame=spsc.df,
         x="step",
-        y="seconds",
+        y="one",
         color="status",
-        title="Pipeline status",
+        color_discrete_map=STATUS_COLORS,
+        title=title,
+        hover_name="name",
+        # Note: the order in hover_data is the order that will appear in the hover box.
         hover_data={
             "status": True,
-            "name": False,
-            "step": False,
-            "seconds": False,
+            "step": True,
             "node": True,
             "elapsed": True,
             "jobId": True,
+            "name": False,
+            "name": False,
+            "one": False,
+            "seconds": False,
         },
         text="name",
         category_orders={
-            "step": spsc.stepNames,
-            "status": STATUS_ORDER,
+            "step": spsc.nonEmptyStepNames,
+            "status": list(STATUS_COLORS),
         },
     )
 
     fig.update_layout(
-        yaxis={"title": "Total seconds"},
-        xaxis={"title": "Pipeline step"},
+        xaxis={"title": args.xtitle},
+        yaxis={"title": args.ytitle},
     )
 
     if args.image:

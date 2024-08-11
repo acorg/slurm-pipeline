@@ -400,13 +400,12 @@ class SlurmPipelineStatusCollection:
     @param names: If not C{None}, an iterable of C{str} names for the passed
         C{specifications}. These must be unique because they are used as dictionary
         keys. If C{None}, names "unnamed-1", "unnamed-2", etc. will be used.
-    @param zeroSecondsValue: The value to use for the 'seconds' column in the
-        pandas data frame if the elapsed value from sacct is "00:00:00".
     """
 
-    def __init__(self, specifications, names=None, zeroSecondsValue=0):
+    def __init__(self, specifications, names=None):
         self.data = {}
         self.stepNames = None
+        self.nonEmptyStepNames = []
         specifications = list(specifications)
         names = (
             list(names)
@@ -466,8 +465,10 @@ class SlurmPipelineStatusCollection:
 
                         elapsedStr = sacct["elapsed"]
                         elapsed.append(elapsedStr)
+                        seconds.append(elapsedToSeconds(elapsedStr))
 
-                        seconds.append(elapsedToSeconds(elapsedStr) or zeroSecondsValue)
+        self.nonEmptyStepNames = [
+            stepName for stepName in self.stepNames if stepName in steps]
 
         self.df = pd.DataFrame(
             {
