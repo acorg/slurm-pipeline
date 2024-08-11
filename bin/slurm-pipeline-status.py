@@ -16,7 +16,7 @@ from slurm_pipeline.sacct import SAcct
 
 parser = argparse.ArgumentParser(
     description=(
-        "Print information about the execution status of a " "scheduled SLURM pipeline."
+        "Print information about the execution status of a scheduled SLURM pipeline."
     )
 )
 
@@ -25,7 +25,7 @@ parser.add_argument(
     "-s",
     metavar="specification.json",
     required=True,
-    help=("The name of the file containing the pipeline status, " "in JSON format."),
+    help="The name of the file containing the pipeline status, in JSON format.",
 )
 
 parser.add_argument(
@@ -46,7 +46,6 @@ group = parser.add_mutually_exclusive_group()
 
 group.add_argument(
     "--printUnfinished",
-    default=False,
     action="store_true",
     help=(
         "Print a list of job ids that have not yet finished. This can be "
@@ -57,14 +56,12 @@ group.add_argument(
 
 group.add_argument(
     "--printFinished",
-    default=False,
     action="store_true",
     help="Print a list of job ids that are finished.",
 )
 
 group.add_argument(
     "--printFinal",
-    default=False,
     action="store_true",
     help=(
         "Print a list of job ids issued by the final steps of a "
@@ -81,15 +78,16 @@ args = parser.parse_args()
 status = SlurmPipelineStatus(args.specification, fieldNames=args.fieldNames)
 
 if args.printFinal:
-    jobs = status.finalJobs()
-    if jobs:
-        print("\n".join(map(str, jobs)))
+    jobsFunc = status.finalJobs
 elif args.printFinished:
-    jobs = status.finishedJobs()
-    if jobs:
-        print("\n".join(map(str, jobs)))
+    jobsFunc = status.finishedJobs
 elif args.printUnfinished:
-    jobs = status.unfinishedJobs()
+    jobsFunc = status.unfinishedJobs
+else:
+    jobsFunc = None
+
+if jobsFunc:
+    jobs = jobsFunc()
     if jobs:
         print("\n".join(map(str, jobs)))
 else:

@@ -1,0 +1,10 @@
+[flake8]
+# Recommend matching the black line length (default 88),
+# rather than using the flake8 default of 79:
+max-line-length = 88
+
+# From https://pypi.org/project/flake8-black/
+extend-ignore =
+    # See https://github.com/PyCQA/pycodestyle/issues/373
+    # Whitespace before colon - which is what black does.
+    E203,W503,E402,W504,BLK100,E501,E252

@@ -80,6 +80,9 @@ The `bin` directory of this repo contains the following Python scripts:
   pipeline (useful for making sure that jobs scheduled in a subsequent run
   of `slurm-pipeline.py` do not begin until the given pipeline has
   finished). See below for more information.
+* `slurm-pipeline-status-plot.py` uses [plotly](https://plotly.com/python/)
+  to produce an interactive HTML and/or a static image to show the progress
+  of a number of pipeline runs.
 * `slurm-pipeline-version.py` prints the version number.
 * `sbatch.py`, a utility script (<a href="#sbatch.py">described below</a>)
   for _ad hoc_ scheduling of a command, optionally with its original
@@ -545,6 +548,30 @@ Step 3: error
     SP_NICE_ARG: --nice
     SP_ORIGINAL_ARGS:
     SP_SKIP: 0
+```
+
+## slurm-pipeline-status-plot.py
+
+```
+usage: slurm-pipeline-status-plot.py [-h] [--nameRegex REGEX]
+    [--html FILE.html] [--image FILE.png]
+    status1.json [status2.json, ...] [status1.json [status2.json, ...] ...]
+
+Create a plot showing the progress of a SLURM pipeline run.
+
+positional arguments:
+  status1.json [status2.json, ...]
+    The JSON (files previously created by slurm-pipeline.py) to examine.
+
+options:
+  -h, --help            show this help message and exit
+  --nameRegex REGEX     A regex with a single capture group to use to extract
+      the name to associate with each status file. The regex will be
+      matched against the status filenames. If not given, the parent directory
+      of each specification status file will be used as its name.
+  --html FILE.html      The (optional) output HTML file.
+  --image FILE.png      An (optional) output image file. Output format is set
+      according to file suffix.
 ```
 
 ## Examples

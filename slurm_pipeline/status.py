@@ -1,7 +1,9 @@
+import pandas as pd
+
 from .base import SlurmPipelineBase
 from .error import SpecificationError
 from .sacct import SAcct
-from .utils import secondsToTime
+from .utils import secondsToTime, elapsedToSeconds
 
 
 class SlurmPipelineStatus(SlurmPipelineBase):
@@ -381,3 +383,101 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             result.extend(self._stepSummary(stepName))
 
         return "\n".join(result)
+
+
+class SlurmPipelineStatusCollection:
+    """
+    Manage SlurmPipelineStatus instances collected from the same pipeline.
+
+    E.g., if you have a pipeline and you run ten samples through the pipeline, you
+    can use this class to gather the SlurmPipelineStatus instances for each sample
+    so you can treat them together. For the reason, the specifications passed must
+    all result from running the same pipeline (i.e., have the same pipeline steps).
+
+    @param specifications: An iterable of either a) C{str} or C{Path} instances, each
+        giving the names of a file, containing a JSON execution specification, or b) a
+        C{dict} holding a correctly formatted execution specification.
+    @param names: If not C{None}, an iterable of C{str} names for the passed
+        C{specifications}. These must be unique because they are used as dictionary
+        keys. If C{None}, names "unnamed-1", "unnamed-2", etc. will be used.
+    @param zeroSecondsValue: The value to use for the 'seconds' column in the
+        pandas data frame if the elapsed value from sacct is "00:00:00".
+    """
+
+    def __init__(self, specifications, names=None, zeroSecondsValue=0):
+        self.data = {}
+        self.stepNames = None
+        specifications = list(specifications)
+        names = (
+            list(names)
+            if names
+            else [f"unnamed-{i}" for i in range(len(specifications))]
+        )
+
+        if len(names) != len(specifications):
+            raise ValueError(
+                "The specifications and names lists are not the same lengths "
+                f"({len(specifications)} != {len(names)})."
+            )
+
+        if len(set(names)) != len(names):
+            raise ValueError(
+                "The list of specification names contains at least one duplicate: "
+                f"{names!r}."
+            )
+
+        for count, (specification, name) in enumerate(
+            zip(specifications, names), start=1
+        ):
+            self.data[name] = SlurmPipelineStatus(specification)
+
+            # Make sure the list of steps is the same for all specifications.
+            theseSteps = list(self.data[name].specification["steps"])
+            if self.stepNames:
+                if self.stepNames != theseSteps:
+                    raise ValueError(
+                        f"The list of steps found in the first specification "
+                        f"{self.stepNames!r} does not match that found in "
+                        f"specification number {count}: {theseSteps!r}."
+                    )
+            else:
+                self.stepNames = theseSteps
+
+        names = []
+        steps = []
+        tasks = []
+        jobIds = []
+        statuses = []
+        nodes = []
+        elapsed = []
+        seconds = []
+
+        for name, status in self.data.items():
+            for stepName, stepInfo in status.specification["steps"].items():
+                for taskName, taskJobIds in stepInfo["tasks"].items():
+                    for jobId in taskJobIds:
+                        sacct = status.sacct.jobs[jobId]
+                        names.append(name)
+                        steps.append(stepName)
+                        tasks.append(taskName)
+                        jobIds.append(jobId)
+                        statuses.append(sacct["state"])
+                        nodes.append(sacct["nodelist"])
+
+                        elapsedStr = sacct["elapsed"]
+                        elapsed.append(elapsedStr)
+
+                        seconds.append(elapsedToSeconds(elapsedStr) or zeroSecondsValue)
+
+        self.df = pd.DataFrame(
+            {
+                "name": names,
+                "step": steps,
+                "task": tasks,
+                "jobId": jobIds,
+                "status": statuses,
+                "node": nodes,
+                "elapsed": elapsed,
+                "seconds": seconds,
+            }
+        )
