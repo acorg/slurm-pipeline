@@ -557,7 +557,7 @@ usage: slurm-pipeline-status-plot.py [-h] [--nameRegex REGEX]
     [--html FILE.html] [--image FILE.png]
     status1.json [status2.json, ...] [status1.json [status2.json, ...] ...]
 
-Create a plot showing the progress of a SLURM pipeline run.
+Create a plot showing the progress of a SLURM pipeline run (or runs).
 
 positional arguments:
   status1.json [status2.json, ...]
@@ -570,6 +570,9 @@ options:
       matched against the status filenames. If not given, the parent directory
       of each specification status file will be used as its name.
   --html FILE.html      The (optional) output HTML file.
+  --title TITLE         The overall plot title.
+  --xtitle TITLE        The x-axis title.
+  --ytitle TITLE        The y-axis title.
   --image FILE.png      An (optional) output image file. Output format is set
       according to file suffix.
 ```

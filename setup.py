@@ -54,10 +54,12 @@ setup(
     extras_require={
         "dev": [
             "flake8",
+            "pandas",
             "pycodestyle",
             "pytest",
         ],
         "test": [
+            "pandas",
             "pytest",
         ],
     },

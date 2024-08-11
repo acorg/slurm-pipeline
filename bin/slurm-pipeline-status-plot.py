@@ -36,7 +36,9 @@ assert len(set(STATUS_COLORS.values())) == len(STATUS_COLORS)
 
 def parseArgs():
     parser = argparse.ArgumentParser(
-        description="Create a plot showing the progress of a SLURM pipeline run.",
+        description=(
+            "Create a plot showing the progress of a SLURM pipeline run (or runs)."
+        ),
     )
 
     parser.add_argument(

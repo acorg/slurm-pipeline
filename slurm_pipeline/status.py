@@ -391,8 +391,8 @@ class SlurmPipelineStatusCollection:
 
     E.g., if you have a pipeline and you run ten samples through the pipeline, you
     can use this class to gather the SlurmPipelineStatus instances for each sample
-    so you can treat them together. For the reason, the specifications passed must
-    all result from running the same pipeline (i.e., have the same pipeline steps).
+    so you can treat them together. For this reason, the specifications passed must
+    all result from running the same pipeline (i.e., have identical pipeline steps).
 
     @param specifications: An iterable of either a) C{str} or C{Path} instances, each
         giving the names of a file, containing a JSON execution specification, or b) a
