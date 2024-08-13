@@ -13,21 +13,21 @@ from slurm_pipeline.status import SlurmPipelineStatusCollection
 # are (mainly) taken from x.colors.qualitative.Plotly with the order changed to be as I
 # want it.
 STATUS_COLORS = {
-    "PENDING": "#B6E880",
-    "RUNNING": "#19D3F3",
-    "COMPLETED": "#00CC96",
-    "FAILED": "#EF553B",
-    "TIMEOUT": "#FF6692",
-    "OUT_OF_MEMORY": "#FF97FF",
-    "CANCELLED": "#BAB0AC",
-    "BOOT_FAIL": "#636EFA",
-    "DEADLINE": "#FFA15A",
-    "NODE_FAIL": "#77B7B2",
-    "PREEMPTED": "#54A24B",
-    "REQUEUED": "#FB00D1",
-    "RESIZING": "#AB63FA",
-    "REVOKED": "#FD3216",
     "SUSPENDED": "#FECB52",
+    "REVOKED": "#FD3216",
+    "RESIZING": "#AB63FA",
+    "REQUEUED": "#FB00D1",
+    "PREEMPTED": "#54A24B",
+    "NODE_FAIL": "#77B7B2",
+    "DEADLINE": "#FFA15A",
+    "BOOT_FAIL": "#636EFA",
+    "CANCELLED": "#BAB0AC",
+    "OUT_OF_MEMORY": "#FF97FF",
+    "TIMEOUT": "#FF6692",
+    "FAILED": "#EF553B",
+    "COMPLETED": "#00CC96",
+    "RUNNING": "#19D3F3",
+    "PENDING": "#B6E880",
 }
 
 # Sanity check that there are no repeated colors.
@@ -155,7 +155,6 @@ def main():
             "one": False,
             "seconds": False,
         },
-        text="name",
         category_orders={
             "step": spsc.nonEmptyStepNames,
             "status": list(STATUS_COLORS),

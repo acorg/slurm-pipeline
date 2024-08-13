@@ -1,4 +1,8 @@
-# Version 4.0.16 - Aug 11, 2024
+# Version 4.0.18 - Aug 13, 2024
+
+Reversed order of status categories displayed in `bin/slurm-pipeline-status-plot.py` plots.
+
+# Version 4.0.17 - Aug 11, 2024
 
 Added "pandas" to test requirements in `setup.py`.
 
