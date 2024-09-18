@@ -46,7 +46,6 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     install_requires=[
-        "kaleido>=0.2.1",
         "pandas",
         "plotly",
         "pytest>=6.2.2",

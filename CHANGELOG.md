@@ -1,3 +1,7 @@
+# Version 4.0.19 - September 18, 2024
+
+Removed `kaleido` from the requirements in `setup.py`. No idea how that got there.
+
 # Version 4.0.18 - Aug 13, 2024
 
 Reversed order of status categories displayed in `bin/slurm-pipeline-status-plot.py` plots.
