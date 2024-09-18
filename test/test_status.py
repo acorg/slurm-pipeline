@@ -1247,7 +1247,7 @@ class TestSlurmPipelineStatusCollection(TestCase):
             ),
         ]
 
-        spsc = SlurmPipelineStatusCollection((status1, status2), zeroSecondsValue=999)
+        spsc = SlurmPipelineStatusCollection((status1, status2))
 
         # Cheap & nasty way to check that SlurmPipelineStatusCollection put
         # things into a DataFrame in the expected way.
@@ -1261,7 +1261,7 @@ class TestSlurmPipelineStatusCollection(TestCase):
 4  unnamed-0    end  yyy     90    RUNNING  cpu-5  04:32:00    16320
 5  unnamed-1  start  xxx     13    RUNNING  cpu-3  00:00:10       10
 6  unnamed-1  start  xxx     35  COMPLETED  cpu-3  00:01:00       60
-7  unnamed-1    end  yyy     57    PENDING  cpu-4  00:00:00      999
+7  unnamed-1    end  yyy     57    PENDING  cpu-4  00:00:00        0
 8  unnamed-1    end  yyy     79  COMPLETED  cpu-4  04:32:00    16320
 9  unnamed-1    end  yyy     91     FAILED  cpu-5  04:32:00    16320\
 """

@@ -1,3 +1,7 @@
+# Version 4.0.20 - September 18, 2024
+
+Fixed failing test.
+
 # Version 4.0.19 - September 18, 2024
 
 Removed `kaleido` from the requirements in `setup.py`. No idea how that got there.
