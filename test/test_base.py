@@ -16,9 +16,11 @@ class TestSlurmPipelineBase(TestCase):
     Tests for the slurm_pipeline.pipeline.SlurmPipelineBase class.
     """
 
-    def testEmptyJSON(self):
+    def testEmptySpecificationFile(self):
         """
-        If the specification file is empty, a ValueError must be raised.
+        If the specification file is empty, a SpecificationError must be raised
+        because the empty file is parsed by toml.read as an empty object, and
+        that will have no 'steps' key.
         """
         data = ""
         with patch.object(builtins, "open", mock_open(read_data=data)):
@@ -26,17 +28,14 @@ class TestSlurmPipelineBase(TestCase):
                 # Don't try to get the pypy error messages right. They're
                 # different under different pypy versions and on my local
                 # machine.
-                self.assertRaises(ValueError, SlurmPipelineBase, "file")
+                self.assertRaises(SpecificationError, SlurmPipelineBase, "file")
             else:
-                error = (
-                    r"^Could not read JSON from 'file': Expecting value: "
-                    r"line 1 column 1 \(char 0\)$"
-                )
-                self.assertRaisesRegex(ValueError, error, SlurmPipelineBase, "file")
+                error = "The specification must have a top-level 'steps' key"
+                self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase, "file")
 
-    def testInvalidJSON(self):
+    def testInvalidJSONandTOMLfile(self):
         """
-        If the specification file does not contain valid JSON, a ValueError
+        If the specification file does not contain valid JSON or TOML, a ValueError
         must be raised.
         """
         data = "{"
@@ -48,11 +47,63 @@ class TestSlurmPipelineBase(TestCase):
                 self.assertRaises(ValueError, SlurmPipelineBase, "file")
             else:
                 error = (
-                    r"^Could not read JSON from 'file': Expecting property "
-                    r"name enclosed in double quotes: line 1 column 2 "
-                    r"\(char 1\)$"
+                    r"^Specification file 'file' could not be parsed as JSON "
+                    r"\(Expecting property name enclosed in double quotes: line 1 "
+                    r"column 2 \(char 1\)\) or TOML \(Key name found without "
+                    r"value\. Reached end of file\. \(line 1 column 2 char 1\)\)\.$"
                 )
                 self.assertRaisesRegex(ValueError, error, SlurmPipelineBase, "file")
+
+    def testValidTOML(self):
+        """
+        It must be possible to load a valid TOML specification.
+        """
+        data = """\
+[[step]]
+name = "one-per-line"
+script = "scripts/one-word-per-line.sh"
+
+[[step]]
+dependencies = ["one-per-line"]
+name = "long-words"
+script = "scripts/long-words-only.sh"
+
+[[step]]
+collect = true
+dependencies = ["long-words"]
+name = "summarize"
+script = "scripts/summarize.sh"\n"""
+        with patch.object(builtins, "open", mock_open(read_data=data)):
+            result = SlurmPipelineBase("file")
+            self.assertEqual(3, len(result.specification["steps"]))
+
+    def testValidJSON(self):
+        """
+        It must be possible to load a valid JSON specification.
+        """
+        data = """\
+{
+    "steps": [
+        {
+            "name": "one-per-line",
+            "script": "scripts/one-word-per-line.sh"
+        },
+        {
+            "dependencies": ["one-per-line"],
+            "name": "long-words",
+            "script": "scripts/long-words-only.sh"
+        },
+        {
+            "collect": true,
+            "dependencies": ["long-words"],
+            "name": "summarize",
+            "script": "scripts/summarize.sh"
+        }
+    ]
+}\n"""
+        with patch.object(builtins, "open", mock_open(read_data=data)):
+            result = SlurmPipelineBase("file")
+            self.assertEqual(3, len(result.specification["steps"]))
 
     def testJSONList(self):
         """
@@ -61,10 +112,7 @@ class TestSlurmPipelineBase(TestCase):
         """
         data = "[]"
         with patch.object(builtins, "open", mock_open(read_data=data)):
-            error = (
-                r"^The specification must be a dict \(i\.e\., a JSON "
-                r"object when loaded from a file\)$"
-            )
+            error = "^The specification must be a dict$"
             self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase, "file")
 
     def testList(self):
@@ -72,10 +120,7 @@ class TestSlurmPipelineBase(TestCase):
         If the specification is passed a list directly instead of a dict, a
         SpecificationError must be raised.
         """
-        error = (
-            r"^The specification must be a dict \(i\.e\., a JSON "
-            r"object when loaded from a file\)$"
-        )
+        error = "^The specification must be a dict$"
         self.assertRaisesRegex(SpecificationError, error, SlurmPipelineBase, [])
 
     def testNoSteps(self):
@@ -453,7 +498,7 @@ class TestSlurmPipelineBase(TestCase):
     def testFinalStepsWithFiveSteps(self):
         """
         If a specification has 5 steps and two of them are not depended on
-        finalSteps must return those two.
+        by anything, finalSteps must return those two.
         """
         specification = {
             "steps": [

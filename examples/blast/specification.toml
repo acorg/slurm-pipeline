@@ -1,0 +1,23 @@
+[[step]]
+name = "start-log"
+script = "./0-start-log.sh"
+
+[[step]]
+name = "split"
+script = "./1-split-fasta.sh"
+
+[[step]]
+dependencies = ["split"]
+name = "blast"
+script = "./2-run-blast.sh"
+
+[[step]]
+collect = true
+dependencies = ["blast"]
+name = "collect"
+script = "./3-collect.sh"
+
+[[step]]
+dependencies = ["collect"]
+name = "end"
+script = "./4-end-log.sh"

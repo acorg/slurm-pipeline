@@ -1,0 +1,25 @@
+[[step]]
+name = "start"
+script = "./0-start.sh"
+
+[[step]]
+dependencies = ["start"]
+name = "species-count"
+script = "./1-species-count.sh"
+
+[[step]]
+collect = true
+dependencies = ["species-count"]
+name = "category-emit"
+script = "./2-category-emit.sh"
+
+[[step]]
+dependencies = ["category-emit"]
+name = "category-count"
+script = "./3-category-count.sh"
+
+[[step]]
+collect = true
+dependencies = ["category-count"]
+name = "summarize"
+script = "./4-summarize.sh"

@@ -1,5 +1,6 @@
-from json import load, dumps
+import json
 from json.decoder import JSONDecodeError
+import toml
 from collections import OrderedDict
 
 from .error import SpecificationError
@@ -10,7 +11,7 @@ class SlurmPipelineBase(object):
     Read a pipeline execution specification or status.
 
     @param specification: Either a C{str} giving the name of a file containing
-        a JSON execution specification, or a C{dict} holding a correctly
+        a JSON or TOML execution specification, or a C{dict} holding a correctly
         formatted execution specification. A passed specification C{dict} is
         not modified. See ../README.md for the expected contents of the
         specification.
@@ -42,10 +43,7 @@ class SlurmPipelineBase(object):
         stepNames = set()
 
         if not isinstance(specification, dict):
-            raise SpecificationError(
-                "The specification must be a dict (i.e., "
-                "a JSON object when loaded from a file)"
-            )
+            raise SpecificationError("The specification must be a dict")
 
         if "steps" not in specification:
             raise SpecificationError(
@@ -128,19 +126,35 @@ class SlurmPipelineBase(object):
     @staticmethod
     def _loadSpecification(specificationFile):
         """
-        Load a JSON execution specification.
+        Load a JSON or TOML execution specification.
 
-        @param specificationFile: A C{str} file name containing a JSON
+        @param specificationFile: A C{str} file name containing a JSON or TOML
             execution specification.
-        @raise ValueError: Will be raised (by L{json.load}) if
-            C{specificationFile} does not contain valid JSON.
-        @return: The parsed JSON specification as a C{dict}.
+        @raise ValueError: If C{specificationFile} does not contain valid JSON or TOML.
+        @return: The parsed specification as a C{dict}.
         """
         with open(specificationFile) as fp:
             try:
-                return load(fp)
+                return json.load(fp)
             except JSONDecodeError as e:
-                raise ValueError(f"Could not read JSON from {specificationFile!r}: {e}")
+                jsonError = e
+
+        with open(specificationFile) as fp:
+            try:
+                specification = toml.load(fp)
+            except toml.decoder.TomlDecodeError as tomlError:
+                raise ValueError(
+                    f"Specification file {specificationFile!r} could not be "
+                    f"parsed as JSON ({jsonError}) or TOML ({tomlError})."
+                )
+            else:
+                # Allow the TOML specification to optionally use 'step' for each step
+                # section, instead of 'steps'.
+                if "step" in specification and "steps" not in specification:
+                    specification["steps"] = specification["step"]
+                    del specification["step"]
+
+                return specification
 
     @staticmethod
     def specificationToJSON(specification):
@@ -164,7 +178,9 @@ class SlurmPipelineBase(object):
                 taskDependencies[taskName] = list(sorted(jobIds))
             steps.append(step)
         specification["steps"] = steps
-        return dumps(specification, sort_keys=True, indent=2, separators=(",", ": "))
+        return json.dumps(
+            specification, sort_keys=True, indent=2, separators=(",", ": ")
+        )
 
     def finalSteps(self):
         """

@@ -1,0 +1,14 @@
+[[step]]
+name = "one-per-line"
+script = "scripts/one-word-per-line.sh"
+
+[[step]]
+dependencies = ["one-per-line"]
+name = "long-words"
+script = "scripts/long-words-only.sh"
+
+[[step]]
+collect = true
+dependencies = ["long-words"]
+name = "summarize"
+script = "scripts/summarize.sh"
