@@ -5,11 +5,8 @@ import time
 import subprocess
 from collections import defaultdict
 from getpass import getuser
-
-try:
-    from subprocess import DEVNULL  # py3k
-except ImportError:
-    DEVNULL = open(os.devnull, "r+b")
+from subprocess import DEVNULL
+from typing import Optional, Iterable
 
 from .base import SlurmPipelineBase
 from .error import SchedulingError, SpecificationError
@@ -41,7 +38,7 @@ class SlurmPipeline(SlurmPipelineBase):
     )
 
     @staticmethod
-    def checkSpecification(specification):
+    def checkSpecification(specification: dict) -> None:
         """
         Check an execution specification is as expected.
 
@@ -80,16 +77,16 @@ class SlurmPipeline(SlurmPipelineBase):
 
     def schedule(
         self,
-        force=False,
-        firstStep=None,
-        lastStep=None,
-        sleep=0.0,
-        scriptArgs=None,
-        skip=None,
-        startAfter=None,
-        nice=None,
-        printOutput=False,
-    ):
+        force: bool = False,
+        firstStep: Optional[str] = None,
+        lastStep: Optional[str] = None,
+        sleep: float = 0.0,
+        scriptArgs: Optional[Iterable[str]] = None,
+        skip: Optional[Iterable[str]] = None,
+        startAfter: Optional[Iterable[int]] = None,
+        nice: Optional[int] = None,
+        printOutput: bool = False,
+    ) -> dict:
         """
         Schedule the running of our execution specification.
 
@@ -184,7 +181,7 @@ class SlurmPipeline(SlurmPipelineBase):
             self._scheduleStep(
                 stepName,
                 steps,
-                scriptArgs,
+                scriptArgs or [],
                 impliedSkip or stepName in skip or "skip" in steps[stepName],
                 startAfter,
             )
@@ -201,7 +198,14 @@ class SlurmPipeline(SlurmPipelineBase):
 
         return specification
 
-    def _scheduleStep(self, stepName, steps, scriptArgs, skip, startAfter):
+    def _scheduleStep(
+        self,
+        stepName: str,
+        steps: dict,
+        scriptArgs: Iterable[str],
+        skip: bool,
+        startAfter: Optional[Iterable[int]],
+    ) -> None:
         """
         Schedule a single execution step.
 
@@ -319,7 +323,7 @@ class SlurmPipeline(SlurmPipelineBase):
 
         step["scheduledAt"] = time.time()
 
-    def _runStepScript(self, step, args, env):
+    def _runStepScript(self, step: dict, args: list[str], env: dict) -> None:
         """
         Run the script for a step, using a given environment and parse its
         output for tasks it scheduled via sbatch.
@@ -405,7 +409,14 @@ class SlurmPipeline(SlurmPipelineBase):
                     )
                 tasks[taskName].update(jobIds)
 
-    def _checkRuntime(self, steps, firstStep=None, lastStep=None, skip=None, nice=None):
+    def _checkRuntime(
+        self,
+        steps: dict,
+        firstStep: Optional[str] = None,
+        lastStep: Optional[str] = None,
+        skip: Optional[set[str]] = None,
+        nice: Optional[int] = None,
+    ) -> None:
         """
         Check that a proposed scheduling makes sense.
 

@@ -1,7 +1,7 @@
 from time import gmtime, strftime
 
 
-def secondsToTime(seconds, sacctCompatible=False):
+def secondsToTime(seconds: float, sacctCompatible: bool = False) -> str:
     """
     Convert a number of seconds to a time string.
 
@@ -15,7 +15,7 @@ def secondsToTime(seconds, sacctCompatible=False):
     )
 
 
-def elapsedToSeconds(elapsed):
+def elapsedToSeconds(elapsed: str) -> int:
     """
     Convert an "elapsed" string (from sacct) to a number of seconds.
 

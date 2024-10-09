@@ -1,4 +1,6 @@
 import pandas as pd
+from typing import Union, Optional, Iterable
+from pathlib import Path
 
 from .base import SlurmPipelineBase
 from .error import SpecificationError
@@ -11,21 +13,23 @@ class SlurmPipelineStatus(SlurmPipelineBase):
     Read a pipeline execution status specification and supply methods for
     examining job ids, step status, etc.
 
-    @param specification: Either a C{str} giving the name of a file containing
-        a JSON execution specification, or a C{dict} holding a correctly
+    @param specification: Either a C{str} or C{Path} giving the name of a file
+        containing a JSON execution specification, or a C{dict} holding a correctly
         formatted execution specification.
-    @param fieldNames: A C{list} of C{str} job field names to obtain from
+    @param fieldNames: A C{str} of comma-separated job field names to obtain from
         sacct. If C{None}, a default set will be used (determined by sacct.py).
         See man sacct for the full list of possible field names.
     """
 
-    def __init__(self, specification, fieldNames=None):
+    def __init__(
+        self, specification: Union[str, Path, dict], fieldNames: Optional[str] = None
+    ) -> None:
         SlurmPipelineBase.__init__(self, specification)
         jobIds = self.jobs() | set(self.specification["startAfter"] or ())
         self.sacct = SAcct(jobIds, fieldNames=fieldNames)
 
     @staticmethod
-    def checkSpecification(specification):
+    def checkSpecification(specification: dict) -> None:
         """
         Check an execution specification is as expected.
 
@@ -40,7 +44,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
 
         SlurmPipelineBase.checkSpecification(specification)
 
-    def finalJobs(self):
+    def finalJobs(self) -> set[int]:
         """
         Get the job ids emitted by the final steps of a specification.
 
@@ -53,7 +57,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
                 result.update(jobIds)
         return result
 
-    def finishedJobs(self):
+    def finishedJobs(self) -> set[int]:
         """
         Get the ids of finished jobs emitted by a specification.
 
@@ -67,7 +71,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             )
         return result
 
-    def unfinishedJobs(self):
+    def unfinishedJobs(self) -> set[int]:
         """
         Get the ids of unfinished jobs emitted by a specification.
 
@@ -81,7 +85,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             )
         return result
 
-    def jobs(self):
+    def jobs(self) -> set[int]:
         """
         Get the ids of all jobs emitted by a specification.
 
@@ -93,7 +97,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             result.update(jobIds)
         return result
 
-    def stepDependentJobIds(self, stepName):
+    def stepDependentJobIds(self, stepName: str) -> set[int]:
         """
         Which dependent jobs must a step wait on?
 
@@ -106,7 +110,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             jobIds.update(taskJobIds)
         return jobIds
 
-    def stepJobIds(self, stepName):
+    def stepJobIds(self, stepName: str) -> set[int]:
         """
         Which jobs did a step emit?
 
@@ -119,14 +123,14 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             jobIds.update(taskJobIds)
         return jobIds
 
-    def _stepSummary(self, stepName):
+    def _stepSummary(self, stepName: str) -> list[str]:
         """
         Collect information about a step.
 
         @param stepName: The C{str} name of a step.
         @return: A C{list} of C{str}s with information about the step.
         """
-        result = []
+        result: list[str] = []
         append = result.append
         step = self.specification["steps"][stepName]
 
@@ -207,10 +211,9 @@ class SlurmPipelineStatus(SlurmPipelineBase):
 
             jobIds = self.stepJobIds(stepName)
             jobIdsCount = len(jobIds)
-            jobIdsFinishedCount = [
-                jobId for jobId in jobIds if self.sacct.finished(jobId)
-            ]
-            jobIdsFinishedCount = len(jobIdsFinishedCount)
+            jobIdsFinishedCount = len(
+                [jobId for jobId in jobIds if self.sacct.finished(jobId)]
+            )
 
             if jobIdsCount:
                 append(
@@ -262,13 +265,13 @@ class SlurmPipelineStatus(SlurmPipelineBase):
 
         return result
 
-    def _stepsSummary(self):
+    def _stepsSummary(self) -> list[str]:
         """
         Collect information summarizing all steps.
 
         @return: A C{list} of C{str}s with information about all steps.
         """
-        summary = []
+        summary: list[str] = []
         append = summary.append
         steps = self.specification["steps"]
         totalJobIdsEmitted = totalJobIdsFinished = 0
@@ -315,7 +318,7 @@ class SlurmPipelineStatus(SlurmPipelineBase):
             "  Jobs finished: %d (%.2f%%)" % (totalJobIdsFinished, percent),
         ] + summary
 
-    def toStr(self):
+    def toStr(self) -> str:
         """
         Get a printable summary of a status specification, including job
         status.
@@ -402,7 +405,11 @@ class SlurmPipelineStatusCollection:
         keys. If C{None}, names "unnamed-1", "unnamed-2", etc. will be used.
     """
 
-    def __init__(self, specifications, names=None):
+    def __init__(
+        self,
+        specifications: Iterable[Union[str, Path, dict]],
+        names: Optional[Iterable[str]] = None,
+    ) -> None:
         self.data = {}
         self.stepNames = None
         self.nonEmptyStepNames = []
@@ -432,15 +439,17 @@ class SlurmPipelineStatusCollection:
 
             # Make sure the list of steps is the same for all specifications.
             theseSteps = list(self.data[name].specification["steps"])
-            if self.stepNames:
+            if self.stepNames is None:
+                self.stepNames = theseSteps
+            else:
                 if self.stepNames != theseSteps:
                     raise ValueError(
                         f"The list of steps found in the first specification "
                         f"{self.stepNames!r} does not match that found in "
                         f"specification number {count}: {theseSteps!r}."
                     )
-            else:
-                self.stepNames = theseSteps
+
+        assert self.stepNames is not None
 
         names = []
         steps = []
@@ -468,7 +477,8 @@ class SlurmPipelineStatusCollection:
                         seconds.append(elapsedToSeconds(elapsedStr))
 
         self.nonEmptyStepNames = [
-            stepName for stepName in self.stepNames if stepName in steps]
+            stepName for stepName in self.stepNames if stepName in steps
+        ]
 
         self.df = pd.DataFrame(
             {

@@ -1,6 +1,7 @@
 from os import environ
 import subprocess
 from collections import defaultdict
+from typing import Optional
 
 from .error import SAcctError
 
@@ -10,14 +11,14 @@ class SAcct:
     Fetch information about job id status from sacct.
 
     @param jobIds: A C{set} of C{int} job ids to retrieve accounting information for.
-    @param fieldNames: A C{list} of C{str} job field names to obtain from
+    @param fieldNames: A C{str} of comma-separated job field names to obtain from
         sacct. If C{None}, C{self.DEFAULT_FIELD_NAMES} will be used. See man
         sacct for the full list of possible field names.
     """
 
     DEFAULT_FIELD_NAMES = "JobName,State,Elapsed,Nodelist"
 
-    def __init__(self, jobIds, fieldNames=None):
+    def __init__(self, jobIds: set[int], fieldNames: Optional[str] = None) -> None:
         self.fieldNames = (
             fieldNames
             or environ.get("SP_STATUS_FIELD_NAMES")
@@ -25,15 +26,16 @@ class SAcct:
         )
         self.jobs = self._callSacct(jobIds) if jobIds else {}
 
-    def _callSacct(self, jobIds):
+    def _callSacct(self, jobIds: set[int]) -> defaultdict[int, dict[str, str]]:
         """
         Call sacct to collect information about the job ids of interest.
 
         @param jobIds: A C{set} of C{int} job ids to get accounting information for.
+        @return: A C{dict} of job information from sacct.
         """
-        # Make a copy of our argument, seeing as we are going to modify it.
+        # Copy of our argument because we will modify it.
         jobIds = set(jobIds)
-        jobs = defaultdict(dict)
+        jobs: defaultdict[int, dict[str, str]] = defaultdict(dict)
         args = [
             "sacct",
             "-P",
@@ -88,7 +90,7 @@ class SAcct:
 
         return jobs
 
-    def finished(self, jobId):
+    def finished(self, jobId: int) -> bool:
         """
         Has a job finished yet?
 
@@ -98,7 +100,7 @@ class SAcct:
         """
         return self.jobs[jobId]["state"] not in {"PENDING", "RUNNING"}
 
-    def failed(self, jobId):
+    def failed(self, jobId: int) -> bool:
         """
         Did a job fail?
 
@@ -108,7 +110,7 @@ class SAcct:
         """
         return self.jobs[jobId]["state"] == "FAILED"
 
-    def completed(self, jobId):
+    def completed(self, jobId: int) -> bool:
         """
         Did a job complete?
 
@@ -118,7 +120,7 @@ class SAcct:
         """
         return self.jobs[jobId]["state"] == "COMPLETED"
 
-    def state(self, jobId):
+    def state(self, jobId: int) -> str:
         """
         Get a job's state.
 
@@ -128,7 +130,7 @@ class SAcct:
         """
         return self.jobs[jobId]["state"]
 
-    def summarize(self, jobId):
+    def summarize(self, jobId: int) -> str:
         """
         Summarize a job's state.
 
