@@ -1,3 +1,7 @@
+# Version 4.1.0 - September 21, 2024
+
+Added support for TOML specification files.
+
 # Version 4.0.20 - September 18, 2024
 
 Fixed failing test.

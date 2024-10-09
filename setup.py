@@ -49,6 +49,7 @@ setup(
         "pandas",
         "plotly",
         "pytest>=6.2.2",
+        "toml",
     ],
     extras_require={
         "dev": [
@@ -56,10 +57,12 @@ setup(
             "pandas",
             "pycodestyle",
             "pytest",
+            "toml",
         ],
         "test": [
             "pandas",
             "pytest",
+            "toml",
         ],
     },
     license="MIT",

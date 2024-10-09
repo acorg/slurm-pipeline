@@ -67,11 +67,12 @@ The `bin` directory of this repo contains the following Python scripts:
 
 * `slurm-pipeline.py` schedules programs to be run in an organized pipeline
   fashion on a Linux cluster that uses SLURM as a workload manager.
-  `slurm-pipeline.py` must be given a JSON pipeline specification (see next
-  section). It prints a corresponding JSON status that contains the
-  original specification plus information about the scheduling (times, job
-  ids, etc). By *pipeline*, I mean a collection of programs that are run in
-  order, taking into account (possibly complex) inter-program dependencies.
+  `slurm-pipeline.py` must be given a [TOML](https://toml.io/en/) or
+  [JSON](https://www.json.org/json-en.html) pipeline specification (see next
+  section). It prints a corresponding JSON status that contains the original
+  specification plus information about the scheduling (times, job ids,
+  etc). By *pipeline*, I mean a collection of programs that are run in order,
+  taking into account (possibly complex) inter-program dependencies.
 * `slurm-pipeline-status.py` must be given a specification status (as
   produced by `slurm-pipeline.py`) and prints a summary of the status
   including job status (obtained from `sacct`). It can also be used to
@@ -94,9 +95,30 @@ The `bin` directory of this repo contains the following Python scripts:
 
 ## Pipeline specification
 
-A pipeline run is scheduled according to a specification file in JSON
+A pipeline run is scheduled according to a specification file in TOML or JSON
 format which is passed to `slurm-pipeline.py`. Several examples of these can
 be found under [`examples`](examples). Here's the one from
+[`examples/word-count/specification.toml`](examples/word-count/specification.toml):
+
+```toml
+[[step]]
+name = "one-per-line"
+script = "scripts/one-word-per-line.sh"
+
+[[step]]
+dependencies = ["one-per-line"]
+name = "long-words"
+script = "scripts/long-words-only.sh"
+
+[[step]]
+collect = true
+dependencies = ["long-words"]
+name = "summarize"
+script = "scripts/summarize.sh"
+```
+
+
+Or, equivalently, in JSON from
 [`examples/word-count/specification.json`](examples/word-count/specification.json):
 
 ```json
@@ -596,6 +618,9 @@ rm -f output/*
 ../../bin/slurm-pipeline.py -s specification.json --scriptArgs texts/*.txt > status.json
 ```
 
+You can also run this example (and all others below) using the TOML
+specification file via `make run-toml`.
+
 This example is more verbose in its output than would be typical. Here's
 what the `output` directory contains after `slurm-pipeline.py` completes:
 
@@ -732,10 +757,10 @@ numbers in the pipeline scripts.
 
 The `examples/word-count-with-skipping` example is exactly the same as
 `examples/word-count` but provides for the possibility of skipping the step
-that filters out short words. If you execute `make run` in that directory,
-you'll see `slurm-pipeline.py` called with `--skip long-words`. The
-resulting `output/MOST-FREQUENT-WORDS` output file contains typical
-frequent (short) English words such as `the`, `and`, etc.
+that filters out short words. If you execute `make run` (or `make run-toml`)
+in that directory, you'll see `slurm-pipeline.py` called with `--skip
+long-words`. The resulting `output/MOST-FREQUENT-WORDS` output file contains
+typical frequent (short) English words such as `the`, `and`, etc.
 
 `make run` actually runs the following command:
 
