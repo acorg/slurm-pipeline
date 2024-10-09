@@ -4,8 +4,8 @@ import sys
 import re
 import argparse
 from pathlib import Path
-import plotly.express as px
-from plotly.io import write_image, write_html
+import plotly.express as px  # type: ignore
+from plotly.io import write_image, write_html  # type: ignore
 
 from slurm_pipeline.status import SlurmPipelineStatusCollection
 
@@ -34,7 +34,7 @@ STATUS_COLORS = {
 assert len(set(STATUS_COLORS.values())) == len(STATUS_COLORS)
 
 
-def parseArgs():
+def parseArgs() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Create a plot showing the progress of a SLURM pipeline run (or runs)."
@@ -94,7 +94,7 @@ def parseArgs():
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
     """
     Make a plotly HTML and/or image to show the status of all samples in a pipeline run.
     """

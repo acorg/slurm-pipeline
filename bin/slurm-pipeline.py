@@ -11,8 +11,9 @@ import sys
 import os
 import argparse
 from itertools import chain
+from typing import Optional
 
-from slurm_pipeline import SlurmPipeline
+from slurm_pipeline.pipeline import SlurmPipeline
 
 
 parser = argparse.ArgumentParser(
@@ -137,6 +138,8 @@ args = parser.parse_args()
 sp = SlurmPipeline(args.specification)
 
 startAfter = list(map(int, args.startAfter)) if args.startAfter else None
+
+scriptArgs: Optional[list[str]]
 
 if args.scriptArgs:
     # Flatten lists of lists that we get from using both nargs='+' and

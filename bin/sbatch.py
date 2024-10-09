@@ -10,6 +10,7 @@ from os.path import exists, join
 from tempfile import mkdtemp
 from time import time, ctime
 from json import dumps
+from typing import Optional, Iterator, Iterable, Union
 
 CONDITION_NAMES = {
     "after": "finally",
@@ -19,7 +20,7 @@ CONDITION_NAMES = {
 }
 
 
-def makeParser():
+def makeParser() -> argparse.ArgumentParser:
     """
     Make an argparse parser for the command line.
 
@@ -53,13 +54,14 @@ def makeParser():
         "--linesPerJob",
         "-N",
         type=int,
+        default=0,
         metavar="N",
         help=(
             "The number of lines of standard input to give to each "
             "invocation of the command. The final invocation will likely "
             "receive fewer lines of input when the original standard input "
-            "empties. If not specified, all lines of standard input are "
-            "passed to the command."
+            "empties. If zero or not specified, all lines of standard input "
+            "are passed to the command."
         ),
     )
 
@@ -349,7 +351,14 @@ def makeParser():
     return parser
 
 
-def filePrefix(count, args, condition=None, array=True, slurmHeader=False, digits=0):
+def filePrefix(
+    count: Optional[int],
+    args: argparse.Namespace,
+    condition: Optional[str] = None,
+    array: bool = True,
+    slurmHeader: bool = False,
+    digits: int = 0,
+) -> str:
     """
     Make a file path prefix.
 
@@ -374,7 +383,7 @@ def filePrefix(count, args, condition=None, array=True, slurmHeader=False, digit
     return join(args.dir, f"{args.prefix}{CONDITION_NAMES[condition]}{suffix}")
 
 
-def creationInfo():
+def creationInfo() -> str:
     """
     Produce information regarding the creation of a script.
 
@@ -383,7 +392,9 @@ def creationInfo():
     return f'Generated {ctime(time())} by {environ.get("USER", "unknown")}.'
 
 
-def writeInputFiles(chunks, args, header=None):
+def writeInputFiles(
+    chunks: Iterable[list[str]], args: argparse.Namespace, header: Optional[str] = None
+) -> int:
     """
     Write out input files.
 
@@ -422,7 +433,13 @@ def writeInputFiles(chunks, args, header=None):
     return count
 
 
-def sbatchTextJobArray(nJobs, command, args, after=None, condition=None):
+def sbatchTextJobArray(
+    nJobs: int,
+    command: str,
+    args: argparse.Namespace,
+    after: Optional[Iterator[Union[str, int]]] = None,
+    condition: Optional[str] = None,
+) -> str:
     """
     Produce shell script text suitable for passing to sbatch to run the
     command using a job array.
@@ -430,7 +447,7 @@ def sbatchTextJobArray(nJobs, command, args, after=None, condition=None):
     @param nJobs: The C{int} number of jobs in the array.
     @param command: The C{str} command to run.
     @param args: An argparse C{Namespace} with command-line options.
-    @param after: An iterable of C{str} job ids that need to complete
+    @param after: An iterable of C{str} or C{int} job ids that need to complete
         (successully) before this job is run. When this is non-empty, the
         script filename will have the condition in it.
     @param condition: A C{str} dependency condition that would have been given
@@ -519,7 +536,15 @@ exec > "$out_" 2> "$err_"
 """
 
 
-def sbatchText(lines, command, count, args, header=None, after=None, condition=None):
+def sbatchText(
+    lines: Optional[Iterable[str]],
+    command: str,
+    count: int,
+    args: argparse.Namespace,
+    header: Optional[str] = None,
+    after: Optional[Iterable[Union[str, int]]] = None,
+    condition: Optional[str] = None,
+) -> str:
     """
     Produce shell script text suitable for passing to sbatch to run the
     command on the input in C{lines}.
@@ -531,7 +556,7 @@ def sbatchText(lines, command, count, args, header=None, after=None, condition=N
     @param args: An argparse C{Namespace} with command-line options.
     @param header: A C{str} header line for the input to be given to the
         command, including trailing newline, or C{None} for no header.
-    @param after: An iterable of C{str} job ids that need to complete
+    @param after: An iterable of C{str} or C{int} job ids that need to complete
         (successully) before this job is run. When this is non-empty, the
         script filename will have the condition in it.
     @param condition: A C{str} dependency condition that would have been given
@@ -632,7 +657,13 @@ exec > {out!r} 2> {err!r}
 """
 
 
-def writeSbatchFile(text, count, args, condition=None, digits=0):
+def writeSbatchFile(
+    text: str,
+    count: Optional[int],
+    args: argparse.Namespace,
+    condition: Optional[str] = None,
+    digits: int = 0,
+) -> None:
     """
     Write a shell script suitable for passing to sbatch to run C{command} on
     the input in C{lines}.
@@ -659,8 +690,14 @@ def writeSbatchFile(text, count, args, condition=None, digits=0):
 
 
 def runSbatch(
-    text, args, count=None, header=None, after=None, condition=None, digits=0
-):
+    text: str,
+    args: argparse.Namespace,
+    count: Optional[int] = None,
+    header: Optional[str] = None,
+    after: Optional[Iterable[Union[str, int]]] = None,
+    condition: Optional[str] = None,
+    digits: int = 0,
+) -> Optional[int]:
     """
     Pass shell script text to sbatch.
 
@@ -669,7 +706,7 @@ def runSbatch(
     @param args: An argparse C{Namespace} with command-line options.
     @param header: A C{str} header line for the input to be given to the
         command, including trailing newline, or C{None} for no header.
-    @param after: An iterable of C{str} job ids that need to complete
+    @param after: An iterable of C{str} or C{int} job ids that need to complete
         (successully) before this job is run.
     @param condition: A C{str} dependency condition to give to sbatch via
         --dependency (see 'man sbatch') (may be C{None} if there are no
@@ -680,7 +717,7 @@ def runSbatch(
     """
     if args.dryRun:
         writeSbatchFile(text, count, args, condition, digits=digits)
-        return
+        return None
 
     sbatchCommand = ["sbatch", "--kill-on-invalid-dep=yes"]
     if after:
@@ -721,21 +758,22 @@ def runSbatch(
         return int(stdout.split()[3])
 
 
-def take(lines, n, header):
+def take(lines: Iterator[str], n: int, header: Optional[str]) -> Iterable[list[str]]:
     """
     Read and yield lines from C{lines} in groups of C{n}, ignoring any header
     lines.
 
     @param lines: An iterable of C{str} lines.
-    @param n: An C{int} number of lines per group.
+    @param n: An C{int} number of lines per group. If zero, all lines are returned
+        as a single group.
     @param header: A C{str} header line to ignore (may be C{None}).
     @return: A generator that produces C{list}s containing C{n} lines, with
         the final list possibly containing fewer, depending on len(lines) % n.
     """
     while True:
         count = 0
-        result = []
-        while count < n:
+        result: list[str] = []
+        while n == 0 or count < n:
             try:
                 line = next(lines)
             except StopIteration:
@@ -751,7 +789,7 @@ def take(lines, n, header):
                         break
 
 
-def main(args):
+def main(args) -> None:
     """
     Read standard input and arrange for groups of lines to be passed to a
     command via sbatch and for additional commands to be scheduled to run
@@ -768,12 +806,8 @@ def main(args):
         if not exists(args.dir):
             os.makedirs(args.dir, exist_ok=False)
 
-    if args.linesPerJob is None:
-        chunks = [sys.stdin]
-        header = None
-    else:
-        header = next(sys.stdin) if args.header else None
-        chunks = take(sys.stdin, args.linesPerJob, header)
+    header = next(sys.stdin) if args.header else None
+    chunks = take(sys.stdin, args.linesPerJob, header)
 
     # Submit the initial jobs.
     initialJobIds = []

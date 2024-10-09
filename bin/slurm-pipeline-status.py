@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+from typing import Optional, Callable
 
 """
 Uses the SlurmPipelineStatus class to print information about a
@@ -10,7 +11,7 @@ specification status, as originally printed by slurm-pipeline.py.
 
 import argparse
 
-from slurm_pipeline import SlurmPipelineStatus
+from slurm_pipeline.status import SlurmPipelineStatus
 from slurm_pipeline.sacct import SAcct
 
 
@@ -77,14 +78,14 @@ args = parser.parse_args()
 
 status = SlurmPipelineStatus(args.specification, fieldNames=args.fieldNames)
 
+jobsFunc: Optional[Callable[[], set[int]]] = None
+
 if args.printFinal:
     jobsFunc = status.finalJobs
 elif args.printFinished:
     jobsFunc = status.finishedJobs
 elif args.printUnfinished:
     jobsFunc = status.unfinishedJobs
-else:
-    jobsFunc = None
 
 if jobsFunc:
     jobs = jobsFunc()

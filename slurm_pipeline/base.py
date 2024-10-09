@@ -2,6 +2,8 @@ import json
 from json.decoder import JSONDecodeError
 import toml
 from collections import OrderedDict
+from pathlib import Path
+from typing import Union
 
 from .error import SpecificationError
 
@@ -10,15 +12,15 @@ class SlurmPipelineBase(object):
     """
     Read a pipeline execution specification or status.
 
-    @param specification: Either a C{str} giving the name of a file containing
-        a JSON or TOML execution specification, or a C{dict} holding a correctly
-        formatted execution specification. A passed specification C{dict} is
-        not modified. See ../README.md for the expected contents of the
+    @param specification: Either a C{str} or C{Path} giving the name of a file
+        containing a JSON or TOML execution specification, or a C{dict} holding a
+        correctly formatted execution specification. A passed specification C{dict}
+        is not modified. See ../README.md for the expected contents of the
         specification.
     """
 
-    def __init__(self, specification):
-        if isinstance(specification, str):
+    def __init__(self, specification: Union[str, Path, dict]) -> None:
+        if isinstance(specification, (str, Path)):
             specification = self._loadSpecification(specification)
         self.checkSpecification(specification)
         self.specification = specification.copy()
@@ -32,7 +34,7 @@ class SlurmPipelineBase(object):
         )
 
     @staticmethod
-    def checkSpecification(specification):
+    def checkSpecification(specification: dict) -> None:
         """
         Check an execution specification is as expected.
 
@@ -124,7 +126,7 @@ class SlurmPipelineBase(object):
                     )
 
     @staticmethod
-    def _loadSpecification(specificationFile):
+    def _loadSpecification(specificationFile: Union[str, Path]) -> dict:
         """
         Load a JSON or TOML execution specification.
 
@@ -157,7 +159,7 @@ class SlurmPipelineBase(object):
                 return specification
 
     @staticmethod
-    def specificationToJSON(specification):
+    def specificationToJSON(specification: dict) -> str:
         """
         Produce a JSON string for a specification.
 
@@ -182,7 +184,7 @@ class SlurmPipelineBase(object):
             specification, sort_keys=True, indent=2, separators=(",", ": ")
         )
 
-    def finalSteps(self):
+    def finalSteps(self) -> set[str]:
         """
         Find the specification steps on which nothing depends. These are the
         the steps that must all finish before a specification has fully

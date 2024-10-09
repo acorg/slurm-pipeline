@@ -1,3 +1,7 @@
+# Version 4.1.1 - October 9, 2024
+
+Added type hints.
+
 # Version 4.1.0 - September 21, 2024
 
 Added support for TOML specification files.

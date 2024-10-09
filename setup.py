@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 
-from setuptools import setup
+from setuptools import setup  # type: ignore
+from pathlib import Path
+import re
 
 
-# Modified from http://stackoverflow.com/questions/2058802/
-# how-can-i-get-the-version-defined-in-setup-py-setuptools-in-my-package
-def version():
-    import os
-    import re
+def version() -> str:
+    """
+    Get the version number from slurm_pipeline/__init__.py
+    """
+    # Modified from http://stackoverflow.com/questions/2058802/
+    # how-can-i-get-the-version-defined-in-setup-py-setuptools-in-my-package
 
-    init = os.path.join("slurm_pipeline", "__init__.py")
+    init = Path("slurm_pipeline", "__init__.py")
     with open(init) as fp:
         initData = fp.read()
     match = re.search(r"^__version__ = ['\"]([^'\"]+)['\"]", initData, re.M)
@@ -58,6 +61,7 @@ setup(
             "pycodestyle",
             "pytest",
             "toml",
+            "toml-types",
         ],
         "test": [
             "pandas",
