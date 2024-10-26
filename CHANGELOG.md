@@ -1,3 +1,7 @@
+# Version 4.1.2 - October 28, 2024
+
+Swapped two colours in the status plot, to make `RUNNING` status more distinct.
+
 # Version 4.1.1 - October 9, 2024
 
 Added type hints.

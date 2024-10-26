@@ -9,9 +9,10 @@ from plotly.io import write_image, write_html  # type: ignore
 
 from slurm_pipeline.status import SlurmPipelineStatusCollection
 
-# Note that the order here is important. It determines the legend order.  These values
-# are (mainly) taken from x.colors.qualitative.Plotly with the order changed to be as I
-# want it.
+# NOTE: the order in the following set is important: it determines the legend order.
+#
+# These values are (mainly) taken from px.colors.qualitative.Plotly described at
+# https://plotly.com/python/discrete-color/
 STATUS_COLORS = {
     "SUSPENDED": "#FECB52",
     "REVOKED": "#FD3216",
@@ -20,13 +21,13 @@ STATUS_COLORS = {
     "PREEMPTED": "#54A24B",
     "NODE_FAIL": "#77B7B2",
     "DEADLINE": "#FFA15A",
-    "BOOT_FAIL": "#636EFA",
+    "BOOT_FAIL": "#19D3F3",
     "CANCELLED": "#BAB0AC",
     "OUT_OF_MEMORY": "#FF97FF",
     "TIMEOUT": "#FF6692",
     "FAILED": "#EF553B",
     "COMPLETED": "#00CC96",
-    "RUNNING": "#19D3F3",
+    "RUNNING": "#636EFA",
     "PENDING": "#B6E880",
 }
 
